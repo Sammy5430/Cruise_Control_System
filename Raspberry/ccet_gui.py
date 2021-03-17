@@ -28,17 +28,17 @@ btn_set_pin = Button(25)
 pwm_out_pin = PWMOutputDevice(13)
 bts_enable_pin = DigitalOutputDevice(12)
 hall_pin = DigitalInputDevice(17)
-brake_sensor = DigitalInputDevice(26)
+brake_sensor = DigitalInputDevice(18)
 
 #volt_sens_pin = MCP3008(channel=0)
 #curr_sens_pin = MCP3008(channel=1)
 # ========================================= #
 
 # ===============Variables================= #
-is_cruise_on = True
+is_cruise_on = False
 magnet_count = 0
 rpm_val = 0
-mph_val = 0     # curr speed
+mph_val = 0     # actual  speed
 v_sensor_val = 99
 i_sensor_val = 0
 pwm_duty_cycle = 0
@@ -53,88 +53,106 @@ cruise_lvl_val = cruise_off_img
 bts_enable_pin.value = 0
 # ========================================= #
 
+
+# TODO: Display kill switch popup using wait_for_press on kill Button
 def killBtn():
+    global pwm_duty_cycle
     bts_enable_pin.value = 0
-    globals()['pwm_duty_cycle'] = 0
-    print(globals()['pwm_duty_cycle'])
+    pwm_duty_cycle = 0
+    print(pwm_duty_cycle)
     pwm_out_pin.value = pwm_duty_cycle
 
 
 def brakeBtn():
-    if globals()['is_cruise_on']:
-        globals()['is_cruise_on'] = False
-        globals()['cruise_set_spd'] = 0
-        set_spd.value = str(cruise_set_spd) + "mph"
+    global is_cruise_on, cruise_set_spd
+    if is_cruise_on:
+        is_cruise_on = False
+        cruise_set_spd = 0
+        set_spd.value = str(cruise_set_spd) + " mph"
         print('brake stopped cruise control')
+
 
 # TODO: Ensure only 1 decimal place is printed
 def incSpeedBtn():
-    if globals()['cruise_set_spd'] <=6:
-        globals()['cruise_set_spd'] = globals()['cruise_set_spd']+1
-        set_spd.value = str(cruise_set_spd) + "mph"
+    global cruise_set_spd
+    if cruise_set_spd <= 6:
+        cruise_set_spd = cruise_set_spd + 1
+        set_spd.value = str(cruise_set_spd) + " mph"
 
 # TODO: Ensure only 1 decimal place is printed
 def decSpeedBtn():
-    if globals()['cruise_set_spd'] >= 4:
-        globals()['cruise_set_spd'] = globals()['cruise_set_spd']-1
-        set_spd.value = str(cruise_set_spd) + "mph"
+    global cruise_set_spd
+    if cruise_set_spd >= 4:
+        cruise_set_spd = cruise_set_spd - 1
+        set_spd.value = str(cruise_set_spd) + " mph"
 
 
 def cruiseSetBtn():
+    global cruise_set_spd, is_cruise_on, mph_val
     if is_cruise_on:
-        globals()['cruise_set_spd'] = 0
-        globals()['is_cruise_on'] = False
+        cruise_set_spd = 0
+        is_cruise_on = False
     else:
-        if globals()['mph_val'] >= 3 or globals()['mph_val'] <= 7:    # if less than 3mph, can't activate
-            globals()['cruise_set_spd'] = globals()['mph_val']
-            globals()['is_cruise_on'] = True
+        if mph_val >= 3 or mph_val <= 7:    # if less than 3mph, can't activate
+            cruise_set_spd = mph_val
+            is_cruise_on = True
 
 
+# TODO: In a worst case scenario, use this to measure other pins
 def rpmCount():
-    globals()['magnet_count'] = globals()['magnet_count'] + 1
+    global magnet_count
+    magnet_count = magnet_count + 1
     if magnet_count >= 2:
         updateRPM()
 
+
 # TODO: Ensure only 1 decimal place is printed
 def updateRPM():
-    globals()['end_time'] = time.time()
-    globals()['rpm_val'] = ((magnet_count * 60) / (globals()['end_time'] - globals()['start_time'])) / 2
-    globals()['mph_val'] = ((diameter / 12) * 3.14 * globals()['rpm_val'] * 60) / 5280
-    globals()['start_time'] = globals()['end_time']
-    globals()['magnet_count'] = 0
-    cur_spd.value = str(globals()['mph_val'])[0:3] + "mph"
-    print("RPM: " + str(globals()['rpm_val']) + "\nMPH: " + str(globals()['mph_val']))
+    global end_time, rpm_val, start_time, mph_val, magnet_count
+    end_time = time.time()
+    rpm_val = ((magnet_count * 60) / end_time - start_time) / 2
+    mph_val = ((diameter / 12) * 3.14 * rpm_val * 60) / 5280
+    start_time = end_time
+    magnet_count = 0
+    cur_spd.value = str(mph_val)[0:3] + " mph"
+    print("RPM: " + str(rpm_val) + "\nMPH: " + str(mph_val))
 
 
 def control():
-    x = (globals()['cruise_set_spd'] - globals()['mph_val']) * 2 #gain = 2(arbitrario) , set val in RPM
+    global cruise_set_spd, mph_val, pwm_duty_cycle
+    x = (cruise_set_spd - mph_val) * 2  # gain = 2(arbitrary), set val in RPM
     print(x)
     if x < 0:
         x = 0
     elif x > 12:
         x = 12
-    globals()['pwm_duty_cycle'] = x / 12
+    pwm_duty_cycle = x / 12
 
 
 def inc_pwm():
+    global pwm_duty_cycle
     if pwm_duty_cycle < 1:
         bts_enable_pin.value = 1
-        globals()['pwm_duty_cycle'] = globals()['pwm_duty_cycle'] + 0.05  #0.05 = ~1.3 +- .1
-        if globals()['pwm_duty_cycle'] > 1:
-            globals()['pwm_duty_cycle'] = 1
+        pwm_duty_cycle = pwm_duty_cycle + 0.05  # 0.05PWM = ~1.3V +- .1
+        if pwm_duty_cycle > 1:
+            pwm_duty_cycle = 1
         print(pwm_duty_cycle)
         pwm_out_pin.value = pwm_duty_cycle
 
 
 def dec_pwm():
+    global pwm_duty_cycle
     if pwm_duty_cycle > 0:
-        globals()['pwm_duty_cycle'] = globals()['pwm_duty_cycle'] - 0.05
-        if globals()['pwm_duty_cycle'] < 0:
-            globals()['pwm_duty_cycle'] = 0
+        pwm_duty_cycle = pwm_duty_cycle - 0.05
+        if pwm_duty_cycle < 0:
+            pwm_duty_cycle = 0
         print(pwm_duty_cycle)
         pwm_out_pin.value = pwm_duty_cycle
 
+
 # TODO: Add voltage sensor input
+# TODO: determine what voltage represents what percentage %
+# TODO: Disable BTS Driver when battery is too low
 def bat_lvl_check():
     if v_sensor_val > 80:
         battery_info_img.value = bat_lvl_5
@@ -151,7 +169,16 @@ def bat_lvl_check():
     elif v_sensor_val > 0:
         battery_info_img.value = bat_lvl_0  # And trigger blink anim
     else:
+        # TODO: Present Out of Battery Popup at 0%
         print("out of battery")
+
+
+def cruise_status_check():
+    if is_cruise_on:
+        cruise_info_img.value = cruise_on_img
+    else:
+        cruise_info_img.value = cruise_off_img
+
 
 # =================Interrupts============== #
 btn_inc_pin.wait_for_press = incSpeedBtn
@@ -187,14 +214,14 @@ battery_info_text = Text(battery_info_box, text="Battery:", color="white", size=
 set_spd_box = Box(app, width="fill", height="fill", align="left", border=True)
 set_spd_txt_padding = Text(set_spd_box, text=" ", color="white", size=35, height=1, align='top')
 set_spd_text = Text(set_spd_box, text="Set Speed", height=2, color="white", size=32)
-set_spd = Text(set_spd_box, text=str(globals()['cruise_set_spd'])+"mph", color="white", size=40)
+set_spd = Text(set_spd_box, text=str(cruise_set_spd)+" mph", color="white", size=40)
 # dec_btn_gui = PushButton(set_spd_box, text="Speed -", height=20, width=20, command=dec_pwm)
 # dec_btn_gui.bg = "white"
 
 cur_spd_box = Box(app, width="fill", height="fill", align="right", border=True)
 cur_spd_txt_padding = Text(cur_spd_box, text=" ", color="white", size=24, height=1, align='top')
 cur_spd_text = Text(cur_spd_box, text="Current Speed", height=2, color="yellow", size=36)
-cur_spd = Text(cur_spd_box, text=str(globals()['mph_val'])+"mph", color="yellow", size=60)
+cur_spd = Text(cur_spd_box, text=str(mph_val)+" mph", color="yellow", size=60)
 # inc_btn_gui = PushButton(cur_spd_box, text="Speed +", height=20, width=20, command=inc_pwm)
 # inc_btn_gui.bg = "white"
 
@@ -208,8 +235,10 @@ app.set_full_screen()
 #     control()
 # =========================================== #
 bat_lvl_check()
+cruise_status_check()
 
 app.display()
 
 # TODO: Add watchdog timer to lower mph to 0 upon stopping
-# TODO: Determine GUI behavior when battery is at 0%
+
+
