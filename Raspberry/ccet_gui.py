@@ -1,11 +1,41 @@
 from guizero import App, Text, Box, PushButton, Picture
 from gpiozero import MCP3008, Button, PWMOutputDevice, DigitalOutputDevice, DigitalInputDevice
 import time
+import threading
 
 # ================Remote=================== #
 import os
 os.environ.__setitem__('DISPLAY', ':0.0')
 # ================Control================== #
+
+
+class piThread (threading.Thread):
+    def __init__(self, threadID, threadName):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.threadName = threadName
+
+    def run(self):
+        if self.threadName is "battery":
+            while True:
+                if bat_blink:
+                    battery_info_img.value = bat_lvl_1
+                    time.sleep(1)
+                    battery_info_img.value = bat_lvl_0
+                    time.sleep(1)
+                else:
+                    time.sleep(1)
+                threadLock.acquire()
+                bat_lvl_check()
+                battery_info_img.value = bat_lvl_val
+                threadLock.release()
+        else:
+            while True:
+                threadLock.acquire()
+                thread_tester2()
+                threadLock.release()
+                time.sleep(1)
+
 
 # ==================Files================== #
 bat_lvl_5 = "/home/pi/Documents/CCET/Battery/battery5.png"
@@ -47,6 +77,8 @@ end_time = 0
 diameter = 26
 cruise_set_spd = 5
 cruise_lvl_val = cruise_off_img
+bat_lvl_val = bat_lvl_5
+bat_blink = False
 # ========================================= #
 
 # ==============Enables==================== #
@@ -154,22 +186,29 @@ def dec_pwm():
 # TODO: determine what voltage represents what percentage %
 # TODO: Disable BTS Driver when battery is too low
 def bat_lvl_check():
+    global v_sensor_val, bat_lvl_val, bat_blink
     if v_sensor_val > 80:
-        battery_info_img.value = bat_lvl_5
+        bat_lvl_val = bat_lvl_5
+        bat_blink = False
     elif v_sensor_val > 60:
-        battery_info_img.value = bat_lvl_4
+        bat_lvl_val = bat_lvl_4
+        bat_blink = False
     elif v_sensor_val > 40:
-        battery_info_img.value = bat_lvl_3
+        bat_lvl_val = bat_lvl_3
+        bat_blink = False
     elif v_sensor_val > 20:
-        battery_info_img.value = bat_lvl_2
+        bat_lvl_val = bat_lvl_2
+        bat_blink = False
     elif v_sensor_val > 10:
-        battery_info_img.value = bat_lvl_1
-    elif v_sensor_val > 5:
-        battery_info_img.value = bat_lvl_1  # And trigger blink anim
+        bat_lvl_val = bat_lvl_1
+        bat_blink = False
     elif v_sensor_val > 0:
-        battery_info_img.value = bat_lvl_0  # And trigger blink anim
+        bat_lvl_val = bat_lvl_1
+        bat_blink = True
     else:
         # TODO: Present Out of Battery Popup at 0%
+        # bat_lvl_val = bat_lvl_0
+        # bat_blink = False
         print("out of battery")
 
 
@@ -180,6 +219,22 @@ def cruise_status_check():
         cruise_info_img.value = cruise_off_img
 
 
+def thread_tester1():
+    global cur_spd
+    i = 0
+    while True:
+        i = i + 1
+        cur_spd.value = str(i) + " mph"
+        time.sleep(3)
+
+
+def thread_tester2():
+    global v_sensor_val
+    v_sensor_val = v_sensor_val - 1
+    print(v_sensor_val)
+    # time.sleep(1)
+
+
 # =================Interrupts============== #
 btn_inc_pin.wait_for_press = incSpeedBtn
 btn_dec_pin.when_pressed = decSpeedBtn
@@ -188,6 +243,8 @@ btn_kill_pin.when_pressed = killBtn
 hall_pin.when_activated = rpmCount
 brake_sensor.when_deactivated = brakeBtn
 # ========================================= #
+
+
 
 # ===================GUI=================== #
 app = App(title="Cruise Control Exhibition Tricycle", bg="#363636")
@@ -207,7 +264,7 @@ cruise_info_text = Text(cruise_info_box, text="Cruise Control:", color="white", 
 
 battery_info_box = Box(info_box, height="fill", width="fill", align="right", border=False)
 battery_info_img_padding = Text(battery_info_box, text=" ", color="white", size=24, height=2, align='right')
-battery_info_img = Picture(battery_info_box, image=bat_lvl_5, width=120,
+battery_info_img = Picture(battery_info_box, image=bat_lvl_val, width=120,
                            height=60, align="right")
 battery_info_text = Text(battery_info_box, text="Battery:", color="white", size=24, height=2)
 
@@ -234,9 +291,15 @@ app.set_full_screen()
 # if is_cruise_on:
 #     control()
 # =========================================== #
-bat_lvl_check()
+# bat_lvl_check()
 cruise_status_check()
 
+
+threadLock = threading.Lock()
+battery_thread = piThread(1, "battery")
+test_thread = piThread(2, "test")
+battery_thread.start()
+test_thread.start()
 app.display()
 
 # TODO: Add watchdog timer to lower mph to 0 upon stopping
