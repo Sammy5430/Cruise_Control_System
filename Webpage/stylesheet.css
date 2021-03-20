@@ -122,6 +122,26 @@ li > h1 {
     padding: 20px 30px 20px 30px;
 }
 
+#cruise {
+    background-color: #262626;
+    float: right
+}
+
+#battery {
+    background-color: #262626;
+    float: left
+}
+
+#setspeed {
+    background-color: #262626;
+    float: left
+}
+
+#actualspeed {
+    background-color: #262626;
+    float: right
+}
+
 .clear {
     clear: both;
 }
