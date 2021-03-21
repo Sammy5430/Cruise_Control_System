@@ -2,21 +2,17 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-var currs = [12, 19, 3, 5, 2, 3, 19, 3, 5, 2, 3, 19, 3, 5, 2, 3, 19, 3, 5, 2, 3, 2 ,3 , 4, 5, 6, 2 ,3 , 4, 5, 6];
-var secs = new Array(30);
+let currs = [12, 19, 3, 5, 2, 3, 19, 3, 5, 2, 3, 19, 3, 5, 2, 3, 19, 3, 5, 2, 3, 2 ,3 , 4, 5, 6, 2 ,3 , 4, 5, 6];
+let secs = new Array(30);
 
-for(var i=0;i<secs.length;i++)
+for(let i=0;i<secs.length;i++)
 {
     secs[i] = i+1;
 }
 
-// To update array:
-// arr.shift();  to remove first element
-// arr.push(); to add new element at the end
-
 let set_speed_gauge = new RadialGauge({
     renderTo: document.getElementById('setspeed'),
-    title: "Set Speed",
+    title: "Speed",
     width: 300,
     height: 300,
     units: "MPH",
@@ -57,7 +53,7 @@ let set_speed_gauge = new RadialGauge({
 
 let actual_speed_gauge = new RadialGauge({
     renderTo: document.getElementById('actualspeed'),
-    title: "Actual Speed",
+    title: "Speed",
     width: 300,
     height: 300,
     units: "MPH",
@@ -105,8 +101,7 @@ let curr_graph = new Chart(graph_ctx,{
         datasets: [{
             label: 'Current',
             data: currs,
-            backgroundColor: 'rgba(255, 99, 132, 0.4)'
-            ,
+            backgroundColor: 'rgba(255, 99, 132, 0.4)',
             borderColor: 'rgba(255, 99, 132, 1)',
             borderWidth: 1
         }]
@@ -150,9 +145,11 @@ let curr_graph = new Chart(graph_ctx,{
 
     }
 })
+
 // if value < 10, valueInt:2
 actual_speed_gauge.update()
 set_speed_gauge.update({value:8.5})
+
 
 // for(var i=10;i<=60;i++)
 // {
@@ -162,7 +159,64 @@ set_speed_gauge.update({value:8.5})
 //     curr_graph.update();
 //     sleep(10000);
 // }
-/*
+
+/** TODO: Implement the following function for speed gauges updates
+ function updateSpeed(gauge, spd)
+ {
+    gauge.update({value:spd})
+ }
+ */
+
+/** TODO: Implement the following function for cruise state updates
+ function updateCruiseStatus(state)
+ {
+    let c = document.getElementById("cruise_state");
+    if(state)
+    {
+        c.checked = true;
+    }
+    else
+    {
+        c.checked = false;
+    }
+ }
+ */
+
+//to change battery, verify received measurement and change image source
+/** TODO: Implement the following function for battery updates
+function updateBattery(volt)
+ {
+    bat_img = document.getElementById("bat_lvl").src
+    if(volt)>80
+    {
+        bat_img = "Images/Battery/battery5.png";
+    }
+    else if (volt > 60)
+    {
+        bat_img = "Images/Battery/battery4.png";
+    }
+    else if (volt > 40)
+    {
+        bat_img = "Images/Battery/battery3.png";
+    }
+    else if (volt > 20)
+    {
+        bat_img = "Images/Battery/battery2.png";
+    }
+    else if (volt > 10)
+    {
+        bat_img = "Images/Battery/battery1.png";
+    }
+    else if (volt > 0)
+    {
+        bat_img = "Images/Battery/battery0.png";
+    }
+ }
+ */
+//
+
+
+/** TODO: Implement the following function for graph updates
 function updateGraph(sec, curr)
 {
     if(secs.length >= 30)

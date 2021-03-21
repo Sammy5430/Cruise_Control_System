@@ -3,7 +3,8 @@
     <head>
         <meta charset="UTF-8">
         <title>Cruise Control Exhibition Tricycle</title>
-        <link type="text/css" , rel="stylesheet" , href="stylesheet.css" , type="text/css">
+        <link type="text/css", rel="stylesheet", href="stylesheet.css">
+        <link type="text/css"href="toggle-switchy.css", rel="stylesheet" />
         <link rel="icon" type="image/png" href="Images/Favicon.png">
         <div class="header">
             <img src="Images/UPRM_Logo.png" , alt="University of Puerto Rico at Mayaguez Logo" , id="uprmLogo">
@@ -59,7 +60,13 @@
                         Cruise State
                     </h1>
                     <div class="row">
-                        <canvas id="cruise" width="300" height="200"></canvas>
+                        <label class="toggle-switchy" for="cruise_state" data-color="green" data-style="rounded"
+                        data-size="xl">
+                            <input checked type="checkbox" id="cruise_state" disabled>
+                            <span class="toggle">
+                                <span class="switch"></span>
+                            </span>
+                        </label>
                     </div>
                     <h1>
                         Set Speed
@@ -88,7 +95,7 @@
                         Battery
                     </h1>
                     <div class="row">
-                        <canvas id="battery" width="300" height="200"></canvas>
+                        <img src="Images/Battery/battery5.png" , alt="Battery Indicator" , id="bat_lvl">
                     </div>
                     <h1>
                         Actual Speed
