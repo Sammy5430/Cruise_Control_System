@@ -152,7 +152,8 @@ body>div>div.row>div.column > h1{
 #graph {
     padding: 1em;
     margin-bottom: 2em;
-    /*background-color: #262626;*/
+    height: 50%;
+    background-color: #262626;
     /*position: center;*/
 }
 

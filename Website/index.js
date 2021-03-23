@@ -2,9 +2,51 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-let currs = [12, 19, 3, 5, 2, 3, 19, 3, 5, 2, 3, 19, 3, 5, 2, 3, 19, 3, 5, 2, 3, 2 ,3 , 4, 5, 6, 2 ,3 , 4, 5, 6];
-let secs = new Array(30);
+let input_data = [
+    ["1", "24.56", "4.0", "4.5", "15.75", "0"],
+    ["1", "24.50", "4.5", "4.5", "10.01", "1"],
+    ["0", "24.48", "5.1", "4.5", "20.89", "2"],
+    ["0", "24.40", "5.0", "4.8", "20.01", "3"],
+    ["1", "23.17", "4.8", "4.8", "5.35", "4"],
+    ["1", "23.15", "5.0", "8.0", "28.75", "5"],
+    ["1", "12.00", "10.8", "10.8", "0.00", "6"],
+    ["1", "24.56", "4.0", "4.5", "15.75", "7"],
+    ["1", "24.50", "4.5", "4.5", "10.01", "8"],
+    ["0", "24.48", "5.1", "4.5", "20.89", "9"],
+    ["0", "24.40", "5.0", "4.8", "20.01", "10"],
+    ["1", "23.17", "4.8", "4.8", "5.35", "11"],
+    ["1", "23.15", "5.0", "8.0", "28.75", "12"],
+    ["0", "12.00", "10.8", "10.8", "0.00", "13"],
+        ["1", "24.50", "4.5", "4.5", "10.01", "14"],
+    ["0", "24.48", "5.1", "4.5", "20.89", "15"],
+    ["0", "24.40", "5.0", "4.8", "20.01", "16"],
+    ["1", "23.17", "4.8", "4.8", "5.35", "17"],
+    ["1", "23.15", "5.0", "8.0", "28.75", "18"],
+    ["1", "12.00", "10.8", "10.8", "0.00", "19"],
+    ["1", "24.56", "4.0", "4.5", "15.75", "20"],
+    ["1", "24.50", "4.5", "4.5", "10.01", "21"],
+    ["0", "24.48", "5.1", "4.5", "20.89", "22"],
+    ["0", "24.40", "5.0", "4.8", "20.01", "23"],
+    ["1", "23.17", "4.8", "4.8", "5.35", "24"],
+    ["1", "23.15", "5.0", "8.0", "28.75", "25"],
+    ["0", "12.00", "10.8", "10.8", "0.00", "26"],
+        ["1", "24.50", "4.5", "4.5", "10.01", "27"],
+    ["0", "24.48", "5.1", "4.5", "20.89", "28"],
+    ["0", "24.40", "5.0", "4.8", "20.01", "29"],
+    ["1", "23.17", "4.8", "4.8", "5.35", "30"],
+    ["1", "23.15", "5.0", "8.0", "28.75", "31"],
+    ["1", "12.00", "10.8", "10.8", "0.00", "32"],
+    ["1", "24.56", "4.0", "4.5", "15.75", "33"],
+    ["1", "24.50", "4.5", "4.5", "10.01", "34"],
+    ["0", "24.48", "5.1", "4.5", "20.89", "35"],
+    ["0", "24.40", "5.0", "4.8", "20.01", "36"],
+    ["1", "23.17", "4.8", "4.8", "5.35", "37"],
+    ["1", "23.15", "5.0", "8.0", "28.75", "38"],
+    ["0", "12.00", "10.8", "10.8", "0.00", "39"]
+];
 
+let currs = [];
+let secs = new Array();
 for(let i=0;i<secs.length;i++)
 {
     secs[i] = i+1;
@@ -107,6 +149,10 @@ let curr_graph = new Chart(graph_ctx,{
         }]
     },
     options: {
+        legend:
+            {
+                display:false
+            },
         scales: {
             yAxes: [{
                 ticks: {
@@ -119,7 +165,7 @@ let curr_graph = new Chart(graph_ctx,{
                 },
                 scaleLabel: {
                     display: true,
-                    labelString: 'Current (mA)',
+                    labelString: 'Current (A)',
                     fontColor: 'rgba(255, 255, 255, 1)',
                     fontSize: 20
                 }
@@ -146,9 +192,9 @@ let curr_graph = new Chart(graph_ctx,{
     }
 })
 
-// if value < 10, valueInt:2
+// if value >= 10, valueInt:2
 actual_speed_gauge.update()
-set_speed_gauge.update({value:8.5})
+set_speed_gauge.update()
 
 
 // for(var i=10;i<=60;i++)
@@ -160,14 +206,14 @@ set_speed_gauge.update({value:8.5})
 //     sleep(10000);
 // }
 
-/** TODO: Implement the following function for speed gauges updates
+/** TODO: Implement the following function for speed gauges updates*/
  function updateSpeed(gauge, spd)
  {
-    gauge.update({value:spd})
+    gauge.value = spd;
  }
- */
 
-/** TODO: Implement the following function for cruise state updates
+
+/** TODO: Implement the following function for cruise state updates*/
  function updateCruiseStatus(state)
  {
     let c = document.getElementById("cruise_state");
@@ -180,52 +226,71 @@ set_speed_gauge.update({value:8.5})
         c.checked = false;
     }
  }
- */
+
 
 //to change battery, verify received measurement and change image source
-/** TODO: Implement the following function for battery updates
+/** TODO: Implement the following function for battery updates*/
 function updateBattery(volt)
  {
-    bat_img = document.getElementById("bat_lvl").src
-    if(volt)>80
+    let bat_img = document.getElementById("bat_lvl")
+    if ((volt/25) *100 > 80)
     {
-        bat_img = "Images/Battery/battery5.png";
+        bat_img.src = "Images/Battery/battery5.png";
     }
-    else if (volt > 60)
+    else if ((volt/25) *100 > 60)
     {
-        bat_img = "Images/Battery/battery4.png";
+        bat_img.src = "Images/Battery/battery4.png";
     }
-    else if (volt > 40)
+    else if ((volt/25) *100 > 40)
     {
-        bat_img = "Images/Battery/battery3.png";
+        bat_img.src = "Images/Battery/battery3.png";
     }
-    else if (volt > 20)
+    else if ((volt/25) *100 > 20)
     {
-        bat_img = "Images/Battery/battery2.png";
+        bat_img.src = "Images/Battery/battery2.png";
     }
-    else if (volt > 10)
+    else if ((volt/25) *100 > 10)
     {
-        bat_img = "Images/Battery/battery1.png";
+        bat_img.src = "Images/Battery/battery1.png";
     }
-    else if (volt > 0)
+    else if ((volt/25) *100 > 0)
     {
-        bat_img = "Images/Battery/battery0.png";
+        bat_img.src = "Images/Battery/battery0.png";
     }
  }
- */
-//
 
 
-/** TODO: Implement the following function for graph updates
+/** TODO: Implement the following function for graph updates*/
 function updateGraph(sec, curr)
 {
-    if(secs.length >= 30)
+    if(secs.length >= 15)
         secs.shift();
     secs.push(sec);
-    if(currs.length >= 30)
+    if(currs.length >= 15)
         currs.shift();
     currs.push(curr);
     curr_graph.update();
 
 }
- */
+
+//for testing:
+async function fileTester(data)
+{
+    // let reader = new FileReader();
+    // let file_blob = new Blob()
+    // let file_string = reader.readAsText(document.getElementById('testfile').files[0]);
+    // let file_array = file_string.split(',')
+    for(let i=0;i<data.length;i++)
+    {
+        updateCruiseStatus(Boolean(parseInt(data[i][0])));
+        updateBattery(parseFloat(data[i][1]));
+        updateSpeed(actual_speed_gauge, parseFloat(data[i][2]));
+        updateSpeed(set_speed_gauge, parseFloat(data[i][3]));
+        updateGraph(parseInt(data[i][5]), parseFloat(data[i][4]));
+        await sleep(800);
+    }
+}
+
+fileTester(input_data);
+
+
