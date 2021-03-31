@@ -51,7 +51,7 @@ class PiThread (threading.Thread):
             while True:
                 if not system_stop:
                     control()
-                    time.sleep(1)
+                    # time.sleep(1)
         elif self.thread_name is "test":
             f = open("/home/pi/Documents/CCET/test_records.csv", 'w')
             f.write("Begin Test\nTime(s),RPM\n")
@@ -114,10 +114,11 @@ bat_blink = False
 system_stop = False
 
 begin_test = False
+prev_pwm = 0                    # used as a hold for control equation
 # ========================================= #
 
 # ==============Enables==================== #
-bts_enable_pin.value = 1            # start at 0 for testing purposes
+bts_enable_pin.value = 0            # start at 0 for testing purposes
 # ========================================= #
 
 
@@ -127,7 +128,10 @@ bts_enable_pin.value = 1            # start at 0 for testing purposes
 def adjust_throttle():
     global throttle_sens_pin, pwm_duty_cycle, is_cruise_on
     if not is_cruise_on:
-        bts_enable_pin.value = 1
+        if is_throttle_active_pin:
+            bts_enable_pin.value = 1
+        else:
+            bts_enable_pin.value = 0
         pwm_duty_cycle = (throttle_sens_pin.value - 0.15) * 1.96
         if pwm_duty_cycle <= 0:
             pwm_duty_cycle = 0
@@ -191,16 +195,28 @@ def brake_press():
 # Serviced by control thread
 # ============================================= #
 def control():
-    global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on
+    global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on, prev_pwm
     if is_cruise_on:
-        x = (cruise_set_spd - mph_val) * 2  # gain = 2(arbitrary), set val in RPM
+        prev_pwm = pwm_duty_cycle
+        if not bts_enable_pin.value:
+            bts_enable_pin.value = 1
+        x = ((cruise_set_spd - mph_val) * 2)   # gain = 2(arbitrary), set val in RPM
         if x < 0:
             x = 0
-        elif x > 12:
-            x = 12
-        pwm_duty_cycle = x / 12
+            # bts_enable_pin.value = 0
+        elif x > 24:
+            x = 24
+        # if x/24 > prev_pwm + 0.05 or x/24 < prev_pwm - 0.05:
+        #     pwm_out_pin.value = prev_pwm
+        #     time.sleep(0.2)     # Varies according to system sample time
+        # else:
+        pwm_duty_cycle = (x / 24)+(cruise_set_spd/10)
+        if pwm_duty_cycle > 1:
+            pwm_duty_cycle = 1
         pwm_out_pin.value = pwm_duty_cycle
-        time.sleep(0.5)     # Varies according to system sample time
+        # print("Control PWM => {x:.2f}".format(x=pwm_duty_cycle))
+            # prev_pwm = pwm_duty_cycle
+        # time.sleep(0.2)     # Varies according to system sample time
 # ============================================= #
 
 
@@ -210,30 +226,32 @@ def control():
 # ============================================= #
 def cruise_set_btn():
     global cruise_set_spd, is_cruise_on, mph_val, bts_enable_pin, begin_test, pwm_duty_cycle
+    # TESTING CODE
     if begin_test:
         begin_test = False
-        bts_enable_pin.value = 0
-        pwm_duty_cycle = 0
+        # bts_enable_pin.value = 0
+        # pwm_duty_cycle = 0
     else:
         begin_test = True
         test_thread.start()
-        i = 0
-        while(i<64):
-            pwm_duty_cycle = pwm_duty_cycle + 0.017
-            if pwm_duty_cycle > 1:
-                pwm_duty_cycle = 1
-            pwm_out_pin.value = pwm_duty_cycle
-            time.sleep(1)
-            i = i+1
+    #     i = 0
+    #     while i < 64:
+    #         pwm_duty_cycle = pwm_duty_cycle + 0.017
+    #         if pwm_duty_cycle > 1:
+    #             pwm_duty_cycle = 1
+    #         pwm_out_pin.value = pwm_duty_cycle
+    #         time.sleep(1)
+    #         i = i+1
 
     # correct method implementation
-    # if is_cruise_on:
-    #     stop_cruise()
-    # else:
-    #     if mph_val >= 3 or mph_val <= 7:    # if less than 3mph, can't activate
-    #         cruise_set_spd = mph_val
-    #         set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
-    #         is_cruise_on = True
+    if is_cruise_on:
+        stop_cruise()
+    else:
+        if mph_val >= 3 or mph_val <= 7:    # if less than 3mph, can't activate
+            cruise_set_spd = mph_val
+            set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
+            # print("Speed was set. Initial PWM => {x:.2f}".format(x=pwm_duty_cycle))
+            is_cruise_on = True
 # ============================================= #
 
 
@@ -320,21 +338,21 @@ def pwm_inc():
         pwm_out_pin.value = pwm_duty_cycle
 # ============================================= #
 
-#
+
 def reduce_to_zero():
-    None
-#     global throttle_sens_pin, mph_val, start_time, end_time
-#     # print(time.time()-start_time)
-#     if time.time()-start_time > 1:
-#         while mph_val > 0:
-#             if is_throttle_active_pin.value:
-#                 break
-#             decrement = mph_val * 0.1  # (1/mph_val+0.01)
-#             mph_val = mph_val - decrement
-#             if mph_val < 0:
-#                 mph_val = 0
-#             cur_spd.value = "{x:.1f} mph".format(x=mph_val)
-#             time.sleep(0.15)
+    # None
+    global throttle_sens_pin, mph_val, start_time, end_time
+    # print(time.time()-start_time)
+    if time.time()-start_time > 1:
+        while mph_val > 0:
+            if is_throttle_active_pin.value:
+                break
+            decrement = mph_val * 0.1  # (1/mph_val+0.01)
+            mph_val = mph_val - decrement
+            if mph_val < 0:
+                mph_val = 0
+            cur_spd.value = "{x:.1f} mph".format(x=mph_val)
+            time.sleep(0.15)
 
 
 # Detects triggering of the hall-effect sensor. Invokes update_rpm after 2 triggers.
@@ -378,8 +396,8 @@ def sys_current_check():
 def sys_voltage_check():
     global v_sensor_val
     v_sensor_val = volt_sens_pin.value * 6 * 5  # +-1%
-    print("Battery Voltage: {x:.1f}V".format(x=v_sensor_val))
-    print("Motor Voltage: {x:.1f}V".format(x=(motor_volt_sens_pin.value * 6 * 5)))
+    # print("Battery Voltage: {x:.1f}V".format(x=v_sensor_val))
+    # print("Motor Voltage: {x:.1f}V".format(x=(motor_volt_sens_pin.value * 6 * 5)))
 # ============================================= #
 
 
@@ -451,20 +469,20 @@ app.set_full_screen()
 # ================Manage Threads============= #
 threadLock = threading.Lock()
 status_thread = PiThread(1, "status")
-# control_thread = PiThread(2, "control")
-test_thread = PiThread(4, "test")
+control_thread = PiThread(2, "control")
 mph_thread = PiThread(3, "mph")
-# throttle_thread = PiThread(4, "throttle")
+throttle_thread = PiThread(4, "throttle")
+test_thread = PiThread(5, "test")
 
-# throttle_thread.start()
+throttle_thread.start()
 status_thread.start()
-# control_thread.start()
+control_thread.start()
 mph_thread.start()
 # =========================================== #
 
 # =================Interrupts============== #
 btn_inc_pin.when_pressed = inc_speed_btn
-btn_inc_pin.when_pressed = pwm_inc
+# btn_inc_pin.when_pressed = pwm_inc
 btn_dec_pin.when_pressed = dec_speed_btn
 btn_set_pin.when_pressed = cruise_set_btn
 btn_kill_pin.when_activated = kill_btn
@@ -475,3 +493,4 @@ brake_sensor.when_deactivated = brake_press
 app.display()
 
 # TODO: Change "0mph" on set speed to "None" when cruise control is OFF
+# TODO: Throttle active pin interrupt
