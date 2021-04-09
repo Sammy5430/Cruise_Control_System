@@ -29,13 +29,50 @@ class PiThread (threading.Thread):
                         time.sleep(1)
                     else:
                         time.sleep(1)
+                    # threadLock.acquire()
                     cruise_state_check()
                     sys_voltage_check()
                     sys_current_check()
                     bat_lvl_check()
+                    battery_info_img.value = bat_lvl_val
+                    print(rpm_val)
+                    # for testing
 
+                    # threadLock.release()
         elif self.thread_name is "mph":
-            None
+            global pwm_duty_cycle, begin_test
+            while True:
+                if begin_test:
+                    # time.sleep(5)
+                    # i = 0
+                    # while i < 3:
+                    #     pwm_duty_cycle = pwm_duty_cycle + 0.3
+                    #     if pwm_duty_cycle > 1:
+                    #         pwm_duty_cycle = 1
+                    #     pwm_out_pin.value = pwm_duty_cycle
+                    #     time.sleep(5)
+                    #     i = i+1
+                    # while i < 6:
+                    #     pwm_duty_cycle = pwm_duty_cycle - 0.3
+                    #     if pwm_duty_cycle < 0:
+                    #         pwm_duty_cycle = 0
+                    #     pwm_out_pin.value = pwm_duty_cycle
+                    #     time.sleep(5)
+                    #     i = i+1
+                    # bts_enable_pin.value = 0
+                    # begin_test = False
+                    pwm_duty_cycle = 0.4
+                    pwm_out_pin.value = pwm_duty_cycle
+                    time.sleep(10)
+                    pwm_duty_cycle = 0.5
+                    pwm_out_pin.value = pwm_duty_cycle
+                    time.sleep(15)
+                    pwm_duty_cycle = 0.6
+                    pwm_out_pin.value = pwm_duty_cycle
+                    time.sleep(15)
+                    begin_test = False
+                    bts_enable_pin.value = 0
+                    pwm_duty_cycle = 0
 
         elif self.thread_name is "throttle":
             while True:
@@ -46,6 +83,20 @@ class PiThread (threading.Thread):
             while True:
                 if not system_stop:
                     control()
+                    # time.sleep(1)
+        elif self.thread_name is "test":
+            f = open("/home/pi/Documents/CCET/test_records.csv", 'w')
+            f.write("Begin Test\nTime(s),RPM\n")
+            f.close()
+            test_start = time.time()
+
+            while True:
+                if begin_test:
+                    f = open("/home/pi/Documents/CCET/test_records.csv", 'a')
+                    f.write("{x:.3f}, {y:.3f}\n".format(x=time.time()-test_start,
+                                                        y=rpm_val))
+                    f.close()
+                    time.sleep(0.01)
 # ============================================= #
 
 
@@ -79,23 +130,26 @@ motor_volt_sens_pin = MCP3008(channel=3, max_voltage=6)  # used for testing
 # ========================================= #
 
 # ===============Variables================= #
-is_cruise_on = False                # flag for cruise on/off
-magnet_count = 0                    # times magnet has passed hall sensor
-rpm_val = 0                         # latest RPM measurement
-prev_rpm_val = 0                    # previous RPM measurement(used for average measurements)
-mph_val = 0                         # actual speed
-v_sensor_val = 25.0                 # value from voltage sensor after conversion
-i_sensor_val = 0                    # value from the current sensor after conversion
-pwm_duty_cycle = 0                  # stores set value for PWM (ranges from 0 to 1)
-start_time = time.time()            # start time for a fraction of a wheel spin. Used for RPM calculations
-end_time = 0                        # end time for a fraction of a wheel spin. Used for RPM calculations
-diameter = 26                       # diameter of the system's wheel. Used for RPM-to-MPH conversion
-cruise_set_spd = 0                  # speed set by the user for cruising
-cruise_lvl_val = cruise_off_img     # used by the GUI to present whether cruise is on or off
-bat_lvl_val = bat_lvl_5             # used by the GUI to present the battery charge level
-bat_blink = False                   # flag for the GUI to blink the battery level indicator on low battery
-system_stop = False                 # flag for the kill switch to halt system execution
-prev_pwm = 0                        # used as a hold for control equation
+is_cruise_on = False            # flag for cruise on/off
+magnet_count = 0                # times magnet has passed hall sensor
+rpm_val = 0                     # actual RPM
+prev_rpm_val = 0                # previous RPM
+mph_val = 0                     # actual speed
+v_sensor_val = 25.0             #
+mv_sensor_val = 0
+i_sensor_val = 0
+pwm_duty_cycle = 0
+start_time = time.time()
+end_time = 0
+diameter = 26
+cruise_set_spd = 0
+cruise_lvl_val = cruise_off_img
+bat_lvl_val = bat_lvl_5
+bat_blink = False
+system_stop = False
+
+begin_test = False
+prev_pwm = 0                    # used as a hold for control equation
 # ========================================= #
 
 # ==============Enables==================== #
@@ -124,8 +178,6 @@ def adjust_throttle():
 # ============================================= #
 
 
-# TODO: Adjust percentage based on motor operation %
-# TODO: Calibrate final implementation
 # Uses measured system voltage to adjust battery charge icon in GUI.
 # Serviced by "status" thread.
 # ============================================= #
@@ -154,12 +206,10 @@ def bat_lvl_check():
         bat_blink = True
     else:
         # print("low battery")
-        # TODO: Determine if charger is connected to automatically close popup
         bat_lvl_val = bat_lvl_0
         bat_blink = False
-        bts_enable_pin.value = 0
-        app.warn(title="Warning", text="Low Battery. Please connect to charger.")
-    battery_info_img.value = bat_lvl_val
+        # bts_enable_pin.value = 0
+        # app.warn(title="Warning", text="Low Battery. Please connect to charger.")
 # ============================================= #
 
 
@@ -173,9 +223,8 @@ def brake_press():
 # ============================================= #
 
 
-# TODO: Implement zero-order hold
 # Uses measured mph and set mph to automatically adjust driver output.
-# Serviced by "control" thread
+# Serviced by control thread
 # ============================================= #
 def control():
     global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on, prev_pwm
@@ -208,14 +257,27 @@ def control():
 # Serviced by main thread via interrupts
 # ============================================= #
 def cruise_set_btn():
-    global cruise_set_spd, is_cruise_on, mph_val, bts_enable_pin
-    if is_cruise_on:
-        stop_cruise()
+    global cruise_set_spd, is_cruise_on, mph_val, bts_enable_pin, begin_test, pwm_duty_cycle
+    # TESTING CODE
+    if begin_test:
+        begin_test = False
+        bts_enable_pin.value = 0
+        pwm_duty_cycle = 0
     else:
-        if mph_val >= 3 or mph_val <= 7:    # if less than 3mph, can't activate
-            cruise_set_spd = mph_val
-            set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
-            is_cruise_on = True
+        begin_test = True
+        pwm_duty_cycle = 0.0
+        pwm_out_pin.value = pwm_duty_cycle
+        test_thread.start()
+
+    # correct method implementation
+    # if is_cruise_on:
+    #     stop_cruise()
+    # else:
+    #     if mph_val >= 3 or mph_val <= 7:    # if less than 3mph, can't activate
+    #         cruise_set_spd = mph_val
+    #         set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
+    #         # print("Speed was set. Initial PWM => {x:.2f}".format(x=pwm_duty_cycle))
+    #         is_cruise_on = True
 # ============================================= #
 
 
@@ -256,8 +318,6 @@ def inc_speed_btn():
 # ============================================= #
 
 
-# TODO: Set enable back to 1 upon kill switch deactivation
-# TODO: Verify wait_for_inactive()
 # Kills the system in case of emergency. Shows popup warning until disengaged.
 # Serviced by main thread via interrupts.
 # ============================================= #
@@ -302,22 +362,20 @@ def pwm_inc():
 # ============================================= #
 
 
-# Reduces MPH measurements to 0 gradually when the sensors stops detecting magnets
-# Serviced by "throttle" thread
-# ============================================= #
 def reduce_to_zero():
-    global is_throttle_active_pin, mph_val, start_time
+    # None
+    global throttle_sens_pin, mph_val, start_time, end_time
     # print(time.time()-start_time)
     if time.time()-start_time > 1:
         while mph_val > 0:
             if is_throttle_active_pin.value:
                 break
-            mph_val = mph_val - 0.5
+            decrement = mph_val * 0.1  # (1/mph_val+0.01)
+            mph_val = mph_val - decrement
             if mph_val < 0:
                 mph_val = 0
             cur_spd.value = "{x:.1f} mph".format(x=mph_val)
             time.sleep(0.15)
-# ============================================= #
 
 
 # Detects triggering of the hall-effect sensor. Invokes update_rpm after 2 triggers.
@@ -347,6 +405,7 @@ def stop_cruise():
 
 # Measures system current (which is used on the webpage graph).
 # Serviced by "status" thread.
+
 # ============================================= #
 def sys_current_check():
     global i_sensor_val
@@ -374,13 +433,25 @@ def update_rpm():
     global end_time, rpm_val, start_time, mph_val, magnet_count, prev_rpm_val
     end_time = time.time()
     rpm_val = ((magnet_count * 60) / (end_time - start_time)) / 9
-    # rpm_val = ((magnet_count * 60) / (end_time - start_time)) / (# magnet groups on wheel * # magnets per group)
+    # rpm_val = ((magnet_count * 60) / (end_time - start_time)) / 2
     rpm_val = (rpm_val + prev_rpm_val) / 2
     prev_rpm_val = rpm_val
     mph_val = ((diameter / 12) * 3.14 * rpm_val * 60) / 5280
     start_time = end_time
     magnet_count = 0
     cur_spd.value = "{x:.1f} mph".format(x=mph_val)
+    # print("RPM: " + str(rpm_val))
+    # print("RPM: " + str(rpm_val) + "\nMPH: " + str(mph_val))
+    # print("Start: {x}  End: {y}".format(x=start_time, y=end_time))
+# ============================================= #
+
+
+# ============================================= #
+def thread_tester2():
+    global v_sensor_val
+    # v_sensor_val = v_sensor_val - 1
+    # print(v_sensor_val)
+    # time.sleep(1)
 # ============================================= #
 
 
@@ -389,6 +460,8 @@ app = App(title="Cruise Control Exhibition Tricycle", bg="#363636")
 
 header_box = Box(app, width="fill", align="top", border=False)
 header_text = Text(header_box, text="Cruise Control Exhibition Tricycle", color="white", height=2, size=24)
+# emergency_btn_gui = PushButton(header_box, text="Emergency Stop", height=20, width=500, command=brake_press)
+# emergency_btn_gui.bg = "red"
 
 info_box = Box(app, width="fill", align="bottom", border=False)
 
@@ -408,11 +481,15 @@ set_spd_box = Box(app, width="fill", height="fill", align="left", border=True)
 set_spd_txt_padding = Text(set_spd_box, text=" ", color="white", size=35, height=1, align='top')
 set_spd_text = Text(set_spd_box, text="Set Speed", height=2, color="white", size=32)
 set_spd = Text(set_spd_box, text=str(cruise_set_spd)+" mph", color="white", size=40)
+# dec_btn_gui = PushButton(set_spd_box, text="Speed -", height=20, width=20, command=pwm_dec)
+# dec_btn_gui.bg = "white"
 
 cur_spd_box = Box(app, width="fill", height="fill", align="right", border=True)
 cur_spd_txt_padding = Text(cur_spd_box, text=" ", color="white", size=24, height=1, align='top')
 cur_spd_text = Text(cur_spd_box, text="Current Speed", height=2, color="yellow", size=36)
 cur_spd = Text(cur_spd_box, text=str(mph_val)+" mph", color="yellow", size=60)
+# inc_btn_gui = PushButton(cur_spd_box, text="Speed +", height=20, width=20, command=pwm_inc)
+# inc_btn_gui.bg = "white"
 
 app.set_full_screen()
 # =========================================== #
@@ -421,18 +498,21 @@ app.set_full_screen()
 threadLock = threading.Lock()
 status_thread = PiThread(1, "status")
 control_thread = PiThread(2, "control")
-# mph_thread = PiThread(3, "mph")
+mph_thread = PiThread(3, "mph")
 throttle_thread = PiThread(4, "throttle")
+test_thread = PiThread(5, "test")
 
+# throttle_thread.start()
 status_thread.start()
-control_thread.start()
+# control_thread.start()
 # mph_thread.start()
-throttle_thread.start()
 # =========================================== #
 
 # =================Interrupts============== #
-btn_inc_pin.when_pressed = inc_speed_btn
-btn_dec_pin.when_pressed = dec_speed_btn
+# btn_inc_pin.when_pressed = inc_speed_btn
+btn_inc_pin.when_pressed = pwm_inc
+# btn_dec_pin.when_pressed = dec_speed_btn
+btn_dec_pin.when_pressed = pwm_dec
 btn_set_pin.when_pressed = cruise_set_btn
 btn_kill_pin.when_activated = kill_btn
 hall_pin.when_activated = rpm_count
@@ -441,4 +521,3 @@ brake_sensor.when_deactivated = brake_press
 
 app.display()
 
-# TODO: Change "0mph" on set speed to "None" when cruise control is OFF
