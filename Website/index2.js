@@ -1,3 +1,4 @@
+/**
 const express = require('express');
 const app = express();
 const http = require('http');
@@ -32,11 +33,12 @@ io.on('connection', (socket) => {
 server.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`)
 })
+*/
 
 let currs = [];
 let secs = [];
 
-/*
+
 let set_speed_gauge = newSpeedGauge('setspeed');
 let actual_speed_gauge = newSpeedGauge('actualspeed');
 let input_data = [
@@ -263,7 +265,6 @@ function sleep(ms) {
 }
 
 // for testing:
-/*
 async function fileTester(data)
 {
     for(let i=0;i<data.length;i++)
@@ -278,6 +279,4 @@ async function fileTester(data)
 }
 
 fileTester(input_data);
-*/
-
 

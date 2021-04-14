@@ -35,7 +35,7 @@ class PiThread (threading.Thread):
                     sys_current_check()
                     bat_lvl_check()
                     battery_info_img.value = bat_lvl_val
-                    print(rpm_val)
+                    # print(rpm_val)
                     # for testing
 
                     # threadLock.release()
@@ -61,18 +61,20 @@ class PiThread (threading.Thread):
                     #     i = i+1
                     # bts_enable_pin.value = 0
                     # begin_test = False
-                    pwm_duty_cycle = 0.4
+                    print("Starting Test")
+                    pwm_duty_cycle = 0
                     pwm_out_pin.value = pwm_duty_cycle
-                    time.sleep(10)
-                    pwm_duty_cycle = 0.5
+                    time.sleep(1)
+                    pwm_duty_cycle = 0.45
                     pwm_out_pin.value = pwm_duty_cycle
-                    time.sleep(15)
-                    pwm_duty_cycle = 0.6
-                    pwm_out_pin.value = pwm_duty_cycle
-                    time.sleep(15)
+                    time.sleep(49)
+                    # pwm_duty_cycle = 0.8
+                    # pwm_out_pin.value = pwm_duty_cycle
+                    # time.sleep(15)
                     begin_test = False
                     bts_enable_pin.value = 0
                     pwm_duty_cycle = 0
+                    print("Ending Test")
 
         elif self.thread_name is "throttle":
             while True:
@@ -85,14 +87,14 @@ class PiThread (threading.Thread):
                     control()
                     # time.sleep(1)
         elif self.thread_name is "test":
-            f = open("/home/pi/Documents/CCET/test_records.csv", 'w')
+            f = open("/home/pi/Documents/CCET/test_records_4_11_2021(11).csv", 'w')
             f.write("Begin Test\nTime(s),RPM\n")
             f.close()
             test_start = time.time()
 
             while True:
                 if begin_test:
-                    f = open("/home/pi/Documents/CCET/test_records.csv", 'a')
+                    f = open("/home/pi/Documents/CCET/test_records_4_11_2021(11).csv", 'a')
                     f.write("{x:.3f}, {y:.3f}\n".format(x=time.time()-test_start,
                                                         y=rpm_val))
                     f.close()
@@ -153,7 +155,7 @@ prev_pwm = 0                    # used as a hold for control equation
 # ========================================= #
 
 # ==============Enables==================== #
-bts_enable_pin.value = 1            # start at 0 for testing purposes
+bts_enable_pin.value = 0           # start at 0 for testing purposes
 # ========================================= #
 
 
@@ -183,10 +185,10 @@ def adjust_throttle():
 # ============================================= #
 def bat_lvl_check():
     global v_sensor_val, bat_lvl_val, bat_blink
-    # 25.4V will be considered a system battery of 100%
+    # 25.5V will be considered a system battery of 100%
     # 23.16V will be considered a system battery of 0%
     # (Vmeasured - Vmin) / (Vmax - Vmin)
-    if ((v_sensor_val - 23.16)/2.24) * 100 > 80:
+    if ((v_sensor_val - 23.16)/2.34) * 100 > 80:
         bat_lvl_val = bat_lvl_5
         bat_blink = False
     elif ((v_sensor_val - 23.16)/2.24) * 100 > 60:
@@ -208,8 +210,8 @@ def bat_lvl_check():
         # print("low battery")
         bat_lvl_val = bat_lvl_0
         bat_blink = False
-        # bts_enable_pin.value = 0
-        # app.warn(title="Warning", text="Low Battery. Please connect to charger.")
+        bts_enable_pin.value = 0
+        app.warn(title="Warning", text="Low Battery. Please connect to charger.")
 # ============================================= #
 
 
@@ -264,6 +266,7 @@ def cruise_set_btn():
         bts_enable_pin.value = 0
         pwm_duty_cycle = 0
     else:
+        bts_enable_pin.value = 1
         begin_test = True
         pwm_duty_cycle = 0.0
         pwm_out_pin.value = pwm_duty_cycle
@@ -421,7 +424,7 @@ def sys_voltage_check():
     global v_sensor_val, motor_volt_sens_pin
     v_sensor_val = volt_sens_pin.value * 6 * 5  # +-1%
     mv_sensor_val = motor_volt_sens_pin.value * 6 * 5
-    # print("Battery Voltage: {x:.1f}V".format(x=v_sensor_val))
+    print("Battery Voltage: {x:.1f}V".format(x=v_sensor_val))
     # print("Motor Voltage: {y:.2f}V".format(y=mv_sensor_val))
 # ============================================= #
 
@@ -505,7 +508,7 @@ test_thread = PiThread(5, "test")
 # throttle_thread.start()
 status_thread.start()
 # control_thread.start()
-# mph_thread.start()
+mph_thread.start()
 # =========================================== #
 
 # =================Interrupts============== #

@@ -3,12 +3,12 @@
     <head>
         <meta charset="UTF-8">
         <title>Cruise Control Exhibition Tricycle</title>
-        <link type="text/css", rel="stylesheet", href="stylesheet.css">
-        <link type="text/css"href="toggle-switchy.css", rel="stylesheet" />
+        <link type="text/css" rel="stylesheet" href="stylesheet.css">
+        <link type="text/css" href="toggle-switchy.css" rel="stylesheet">
         <link rel="icon" type="image/png" href="Images/Favicon.png">
         <div class="header">
-            <img src="Images/UPRM_Logo.png" , alt="University of Puerto Rico at Mayaguez Logo" , id="uprmLogo">
-            <img src="Images/College_Logo.png" , alt="College of Engineering Logo" , id="collegeLogo">
+            <img src="Images/UPRM_Logo.png" alt="University of Puerto Rico at Mayaguez Logo" id="uprmLogo">
+            <img src="Images/College_Logo.png" alt="College of Engineering Logo" id="collegeLogo">
             <h1>
                 Cruise Control Exhibition Tricycle
             </h1>
@@ -55,7 +55,7 @@
     <body>
         <div>
             <div class="row">
-                <img src="Images/Logo.png" , alt="Los Ciclistas Team Logo" , height="100" , id="ciclistasLogo">
+                <img src="Images/Logo.png" alt="Los Ciclistas Team Logo" height="100" id="ciclistasLogo">
             </div>
             <div class="row">
                 <div class="column">
@@ -65,7 +65,7 @@
                     <div class="row">
                         <label class="toggle-switchy" for="cruise_state" data-color="green" data-style="rounded"
                         data-size="xl">
-                            <input checked type="checkbox" id="cruise_state" disabled>
+                            <input unchecked type="checkbox" id="cruise_state" disabled>
                             <span class="toggle">
                                 <span class="switch"></span>
                             </span>
@@ -85,7 +85,7 @@
                         </h1>
                     </div>
                     <div class="row">
-                        <canvas id="graph", width="400", height="400"></canvas>
+                        <canvas id="graph" width="400" height="400"></canvas>
                     </div>
                     <div class="row">
                         <p id="help">
@@ -100,7 +100,7 @@
                         Battery
                     </h1>
                     <div class="row">
-                        <img src="Images/Battery/battery5.png" , alt="Battery Indicator" , id="bat_lvl">
+                        <img src="Images/Battery/battery5.png" alt="Battery Indicator" id="bat_lvl">
                     </div>
                     <h1>
                         Actual Speed
@@ -110,10 +110,9 @@
                     </div>
                 </div>
             </div>
-
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.3/socket.io.js"></script>
+            <script src="/node_modules/socket.io/client-dist/socket.io.js"></script>
             <script src="node_modules/canvas-gauges/gauge.min.js" type="text/javascript"></script>
-            <script src="node_modules/chart.js/dist/Chart.js" type="text/javascript"></script>
+            <script src="node_modules/chart.js/dist/Chart.js"></script>
             <script src="index.js" type="text/javascript"></script>
         </div>
     </body>
