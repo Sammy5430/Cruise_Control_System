@@ -38,26 +38,19 @@ class PiThread (threading.Thread):
 
         elif self.thread_name is "comms":
             sio = socketio.Client()
+            sio.connect('http://10.31.1.223:3000')
+            t = 0
             while True:
-                try:
-                    sio.connect('http://10.31.1.11:3000')
-                except:
-                    None
-                t = 0
-                while True:
-                    try:
-                        sio.emit('data_update', {
-                            'Battery': bat_pct,
-                            'Cruise State': is_cruise_on,
-                            'Set Speed': cruise_set_spd,
-                            'Actual Speed': mph_val,
-                            'Current': curr_sens_pin.value,      # TODO: Convert to I measurement
-                            'Time': t
-                        })
-                        time.sleep(1)
-                        t = t+1
-                    except:
-                        break
+                sio.emit('data_update', {
+                    'Battery': bat_pct,
+                    'Cruise State': is_cruise_on,
+                    'Set Speed': cruise_set_spd,
+                    'Actual Speed': mph_val,
+                    'Current': curr_sens_pin.value,      # TODO: Convert to I measurement
+                    'Time': t
+                })
+                time.sleep(1)
+                t = t+1
 
         elif self.thread_name is "throttle":
             while True:
@@ -67,7 +60,7 @@ class PiThread (threading.Thread):
         elif self.thread_name is "control":
             while True:
                 if not system_stop:
-                    pi_control()
+                    pi_control_static()
                     time.sleep(0.01)
 # ============================================= #
 
@@ -126,6 +119,8 @@ control_act = 0                             # determined output for the controll
 prev_control_act = 0                        # determined output for the controller. Previous measurement
 control_gain = 0.42                         # controller gain. Preliminary values from C Falero testing
 control_zero = 0.9888                       # controller zero. Preliminary values from C Falero testing
+control_gain_static = 0.15195               # controller gain. Preliminary values from C Falero testing
+control_zero_static = 0.922                 # controller zero. Preliminary values from C Falero testing
 bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
 bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
 # ========================================= #
@@ -217,7 +212,7 @@ def brake_press():
 # ============================================= #
 def pi_control():
     global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on, prev_pwm, control_err, control_act, control_gain, \
-        prev_control_act, prev_control_err
+        prev_control_act, prev_control_err, control_zero
     if is_cruise_on:
         prev_pwm = pwm_duty_cycle
         if not bts_enable_pin.value:
@@ -236,10 +231,38 @@ def pi_control():
         pwm_out_pin.value = pwm_duty_cycle
     else:
         prev_control_err = mph_val
-        prev_control_act = prev_pwm*(24)
-
+        prev_control_act = prev_pwm * 24
 # ============================================= #
 
+
+# Proportional Integral Controller implementation for static demonstrations.
+# Uses measured mph and set mph to automatically adjust driver output.
+# Serviced by "control" thread
+# ============================================= #
+def pi_control_static():
+    global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on, prev_pwm, control_err, control_act, \
+        control_gain_static, prev_control_act, prev_control_err, control_zero_static
+    if is_cruise_on:
+        prev_pwm = pwm_duty_cycle
+        if not bts_enable_pin.value:
+            bts_enable_pin.value = 1
+        control_err = cruise_set_spd - mph_val
+        control_act = (control_err * control_gain_static) - (prev_control_err * control_gain_static *
+                                                             control_zero_static) + prev_control_act
+        if control_act < 0:
+            control_act = 0
+        elif control_act > 24:
+            control_act = 24
+        pwm_duty_cycle = (control_act/24)
+        if pwm_duty_cycle > 1:
+            pwm_duty_cycle = 1
+        prev_control_err = control_err
+        prev_control_act = control_act
+        pwm_out_pin.value = pwm_duty_cycle
+    else:
+        prev_control_err = mph_val
+        prev_control_act = prev_pwm * 24
+# ============================================= #
 
 # Proportional Controller implementation.
 # Uses measured mph and set mph to automatically adjust driver output.
@@ -425,7 +448,7 @@ def stop_cruise():
 def sys_current_check():
     global i_sensor_val
     i_sensor_val = ((curr_sens_pin.value - 0.5) * 6) / 66
-    # print("System Current: {x:.4f}A".format(x=i_sensor_val))
+    print("System Current: {x:.4f}A".format(x=i_sensor_val))
 # ============================================= #
 
 
@@ -494,7 +517,7 @@ cur_spd_txt_padding = Text(cur_spd_box, text=" ", color="white", size=24, height
 cur_spd_text = Text(cur_spd_box, text="Current Speed", height=2, color="yellow", size=36)
 cur_spd = Text(cur_spd_box, text=str(mph_val)+" mph", color="yellow", size=60)
 
-app.set_full_screen()
+app.set_full_screen('Esc')
 # =========================================== #
 
 # ================Manage Threads============= #

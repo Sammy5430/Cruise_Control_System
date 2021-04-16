@@ -1,43 +1,29 @@
-/**
-const express = require('express');
-const app = express();
-const http = require('http');
-const server = http.createServer(app);
-const io = require('socket.io')(server);
-const port = 3000
+// const gauge = require('canvas-gauges');
+// const chart = require('chart.js');
+// var app = require('./server');
+// import { io } from "socket.io-client";
 
-app.use(express.static(__dirname));
-app.use(express.static(__dirname + '/node_modules/canvas-gauges'));
+const socket = io('http://localhost:3000');
 
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/index.html');
+socket.connect();
+
+socket.on('send_data', function (data) {
+    updateCruiseStatus(data['Cruise State']);
+    // console.log('Cruise State: ' + data['Cruise State']);
+    updateSpeed(set_speed_gauge, data['Set Speed']);
+    // console.log('Set Speed: ' + data['Set Speed']);
+    updateSpeed(actual_speed_gauge,data['Actual Speed']);
+    // console.log('Actual Speed: ' + data['Actual Speed']);
+    updateGraph(data['Time'], data['Current']);
+    // console.log('Current: ' + data['Current']);
+    updateBattery(data['Battery']);
+    // console.log('Battery: ' + data['Battery']);
 });
 
-io.on('connection', (socket) => {
-    console.log('a user connected');
-    socket.on('data_update', (data) => {
-        console.log('Data Set ' + data['Time']);
-        // updateCruiseStatus(data['Cruise State']);
-        console.log('Cruise State: ' + data['Cruise State']);
-        // updateSpeed(set_speed_gauge, data['Set Speed']);
-        console.log('Set Speed: ' + data['Set Speed']);
-        // updateSpeed(actual_speed_gauge,data['Actual Speed']);
-        console.log('Actual Speed: ' + data['Actual Speed']);
-        // updateGraph(data['Time'], data['Current']);
-        console.log('Current: ' + data['Current']);
-        // updateBattery(data['Battery']);
-        console.log('Battery: ' + data['Battery']);
-    });
-});
 
-server.listen(port, () => {
-    console.log(`Example app listening at http://localhost:${port}`)
-})
-*/
 
 let currs = [];
 let secs = [];
-
 
 let set_speed_gauge = newSpeedGauge('setspeed');
 let actual_speed_gauge = newSpeedGauge('actualspeed');
@@ -260,23 +246,22 @@ function updateGraph(sec, curr) {
 }
 
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+// function sleep(ms) {
+//     return new Promise(resolve => setTimeout(resolve, ms));
+// }
+//
+// // for testing:
+// async function fileTester(data)
+// {
+//     for(let i=0;i<data.length;i++)
+//     {
+//         updateCruiseStatus(Boolean(parseInt(data[i][0])));
+//         updateBattery(parseFloat(data[i][1]));
+//         updateSpeed(actual_speed_gauge, parseFloat(data[i][2]));
+//         updateSpeed(set_speed_gauge, parseFloat(data[i][3]));
+//         updateGraph(parseInt(data[i][5]), parseFloat(data[i][4]));
+//         await sleep(800);
+//     }
+// }
 
-// for testing:
-async function fileTester(data)
-{
-    for(let i=0;i<data.length;i++)
-    {
-        updateCruiseStatus(Boolean(parseInt(data[i][0])));
-        updateBattery(parseFloat(data[i][1]));
-        updateSpeed(actual_speed_gauge, parseFloat(data[i][2]));
-        updateSpeed(set_speed_gauge, parseFloat(data[i][3]));
-        updateGraph(parseInt(data[i][5]), parseFloat(data[i][4]));
-        await sleep(800);
-    }
-}
-
-fileTester(input_data);
-
+// fileTester(input_data);
