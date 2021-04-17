@@ -21,11 +21,9 @@ const io = SocketIO(server);
 
 //connection event
 io.on('connection', (socket) => {
-    console.log('a user connected');
+    console.log('A user connected');
     socket.on('data_update', (data) => {
-        console.log('recibi alguito', data);
         io.emit('send_data', data);
-        console.log('envie alguito');
     });
 });
 

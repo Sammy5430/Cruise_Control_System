@@ -1,25 +1,14 @@
-// const gauge = require('canvas-gauges');
-// const chart = require('chart.js');
-// var app = require('./server');
-// import { io } from "socket.io-client";
-
 const socket = io('http://localhost:3000');
 
 socket.connect();
 
 socket.on('send_data', function (data) {
     updateCruiseStatus(data['Cruise State']);
-    // console.log('Cruise State: ' + data['Cruise State']);
     updateSpeed(set_speed_gauge, data['Set Speed']);
-    // console.log('Set Speed: ' + data['Set Speed']);
     updateSpeed(actual_speed_gauge,data['Actual Speed']);
-    // console.log('Actual Speed: ' + data['Actual Speed']);
     updateGraph(data['Time'], data['Current']);
-    // console.log('Current: ' + data['Current']);
     updateBattery(data['Battery']);
-    // console.log('Battery: ' + data['Battery']);
 });
-
 
 
 let currs = [];
@@ -27,54 +16,6 @@ let secs = [];
 
 let set_speed_gauge = newSpeedGauge('setspeed');
 let actual_speed_gauge = newSpeedGauge('actualspeed');
-let input_data = [
-    ["1", "24.56", "4.0", "4.5", "15.75", "0"],
-    ["1", "24.50", "4.5", "4.5", "10.01", "1"],
-    ["0", "24.48", "5.1", "4.5", "20.89", "2"],
-    ["0", "24.40", "5.0", "4.8", "20.01", "3"],
-    ["1", "23.17", "4.8", "4.8", "5.35", "4"],
-    ["1", "23.15", "5.0", "8.0", "28.75", "5"],
-    ["1", "12.00", "10.8", "10.8", "0.00", "6"],
-    ["1", "24.56", "4.0", "4.5", "15.75", "7"],
-    ["1", "24.50", "4.5", "4.5", "10.01", "8"],
-    ["0", "24.48", "5.1", "4.5", "20.89", "9"],
-    ["0", "24.40", "5.0", "4.8", "20.01", "10"],
-    ["1", "23.17", "4.8", "4.8", "5.35", "11"],
-    ["1", "23.15", "5.0", "8.0", "28.75", "12"],
-    ["0", "12.00", "10.8", "10.8", "0.00", "13"],
-    ["1", "24.50", "4.5", "4.5", "10.01", "14"],
-    ["0", "24.48", "5.1", "4.5", "20.89", "15"],
-    ["0", "24.40", "5.0", "4.8", "20.01", "16"],
-    ["1", "23.17", "4.8", "4.8", "5.35", "17"],
-    ["1", "23.15", "5.0", "8.0", "28.75", "18"],
-    ["1", "12.00", "10.8", "10.8", "0.00", "19"],
-    ["1", "24.56", "4.0", "4.5", "15.75", "20"],
-    ["1", "24.50", "4.5", "4.5", "10.01", "21"],
-    ["0", "24.48", "5.1", "4.5", "20.89", "22"],
-    ["0", "24.40", "5.0", "4.8", "20.01", "23"],
-    ["1", "23.17", "4.8", "4.8", "5.35", "24"],
-    ["1", "23.15", "5.0", "8.0", "28.75", "25"],
-    ["0", "12.00", "10.8", "10.8", "0.00", "26"],
-    ["1", "24.50", "4.5", "4.5", "10.01", "27"],
-    ["0", "24.48", "5.1", "4.5", "20.89", "28"],
-    ["0", "24.40", "5.0", "4.8", "20.01", "29"],
-    ["1", "23.17", "4.8", "4.8", "5.35", "30"],
-    ["1", "23.15", "5.0", "8.0", "28.75", "31"],
-    ["1", "12.00", "10.8", "10.8", "0.00", "32"],
-    ["1", "24.56", "4.0", "4.5", "15.75", "33"],
-    ["1", "24.50", "4.5", "4.5", "10.01", "34"],
-    ["0", "24.48", "5.1", "4.5", "20.89", "35"],
-    ["0", "24.40", "5.0", "4.8", "20.01", "36"],
-    ["1", "23.17", "4.8", "4.8", "5.35", "37"],
-    ["1", "23.15", "5.0", "8.0", "28.75", "38"],
-    ["0", "12.00", "10.8", "10.8", "0.00", "39"]
-];
-
-
-for(let i=0;i<secs.length;i++)
-{
-    secs[i] = i+1;
-}
 
 function newSpeedGauge(renderLocation){
     return new RadialGauge({
@@ -183,13 +124,12 @@ actual_speed_gauge.update()
 set_speed_gauge.update()
 
 
-/** TODO: Implement the following function for speed gauges updates*/
+/** TODO: Ensure speed label matches up with needle values*/
  function updateSpeed(gauge, spd) {
     gauge.value = spd;
  }
 
 
-/** TODO: Implement the following function for cruise state updates*/
  function updateCruiseStatus(state) {
     let c = document.getElementById("cruise_state");
     if(state)
@@ -203,7 +143,6 @@ set_speed_gauge.update()
  }
 
 
-/** TODO: Implement the following function for battery updates*/
 function updateBattery(bat_pct) {
     let bat_img = document.getElementById("bat_lvl")
     if (bat_pct > 80)
@@ -233,8 +172,10 @@ function updateBattery(bat_pct) {
  }
 
 
-/** TODO: Implement the following function for graph updates*/
+/** TODO: Clear the graph on new pi connection*/
 function updateGraph(sec, curr) {
+    // if (sec == 0)
+    //     curr_graph.clear();
     if(secs.length >= 15)
         secs.shift();
     secs.push(sec);
@@ -244,24 +185,3 @@ function updateGraph(sec, curr) {
     curr_graph.update();
 
 }
-
-
-// function sleep(ms) {
-//     return new Promise(resolve => setTimeout(resolve, ms));
-// }
-//
-// // for testing:
-// async function fileTester(data)
-// {
-//     for(let i=0;i<data.length;i++)
-//     {
-//         updateCruiseStatus(Boolean(parseInt(data[i][0])));
-//         updateBattery(parseFloat(data[i][1]));
-//         updateSpeed(actual_speed_gauge, parseFloat(data[i][2]));
-//         updateSpeed(set_speed_gauge, parseFloat(data[i][3]));
-//         updateGraph(parseInt(data[i][5]), parseFloat(data[i][4]));
-//         await sleep(800);
-//     }
-// }
-
-// fileTester(input_data);
