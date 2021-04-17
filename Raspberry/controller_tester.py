@@ -62,6 +62,20 @@ class PiThread (threading.Thread):
                 if not system_stop:
                     pi_control_static()
                     time.sleep(0.01)
+        elif self.thread_name is "test":
+            f = open("/home/pi/Documents/CCET/test_records_4_17_2021(1).csv", 'w')
+            f.write("Time(s),RPM,Current Sensor, Current Value\n")
+            f.close()
+            test_start = time.time()
+
+            while True:
+                if begin_test:
+                    f = open("/home/pi/Documents/CCET/test_records_4_17_2021(1).csv", 'a')
+                    f.write("{x:.3f}, {y:.3f}, {z:.3f}, {w:.3f}\n".format(x=time.time()-test_start,
+                                                                          y=rpm_val, z=curr_sens_pin.value,
+                                                                          w=i_sensor_val))
+                    f.close()
+                    time.sleep(0.01)
 # ============================================= #
 
 
@@ -120,10 +134,11 @@ control_act = 0                             # determined output for the controll
 prev_control_act = 0                        # determined output for the controller. Previous measurement
 control_gain = 0.42                         # controller gain. Preliminary values from C Falero testing
 control_zero = 0.9888                       # controller zero. Preliminary values from C Falero testing
-control_gain_static = 0.15195               # controller gain. Preliminary values from C Falero testing
-control_zero_static = 0.922                 # controller zero. Preliminary values from C Falero testing
+control_gain_static = 0.04027               # controller gain. Preliminary values from C Falero testing
+control_zero_static = 0.902                 # controller zero. Preliminary values from C Falero testing
 bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
 bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
+begin_test = False
 # ========================================= #
 
 # ==============Enables==================== #
@@ -295,14 +310,17 @@ def p_control():
 # Serviced by main thread via interrupts
 # ============================================= #
 def cruise_set_btn():
-    global cruise_set_spd, is_cruise_on, mph_val, cruise_set_rpm
+    global cruise_set_spd, is_cruise_on, mph_val, cruise_set_rpm, begin_test
     if is_cruise_on:
+        begin_test = False
         stop_cruise()
     else:
         if 3 <= mph_val <= 7:    # if less than 3mph, can't activate
+            begin_test = True
             is_cruise_on = True
             cruise_set_spd = mph_val
             cruise_set_rpm = rpm_val
+            test_thread.start()
             set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
 # ============================================= #
 
@@ -456,7 +474,7 @@ def stop_cruise():
 # ============================================= #
 def sys_current_check():
     global i_sensor_val
-    i_sensor_val = ((curr_sens_pin.value - 0.5) * 6) / 66
+    i_sensor_val = ((curr_sens_pin.value * 6) - 2.5) / 0.066
     # print("System Current: {x:.4f}A".format(x=i_sensor_val))
 # ============================================= #
 
@@ -535,6 +553,7 @@ status_thread = PiThread(1, "status")
 control_thread = PiThread(2, "control")
 comms_thread = PiThread(3, "comms")
 throttle_thread = PiThread(4, "throttle")
+test_thread = PiThread(5, "test")
 
 status_thread.start()
 control_thread.start()
