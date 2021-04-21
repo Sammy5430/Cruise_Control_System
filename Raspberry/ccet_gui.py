@@ -118,10 +118,10 @@ control_err = 0                             # difference between set speed and a
 prev_control_err = 0                        # difference between set speed and actual speed. Previous measurement
 control_act = 0                             # determined output for the controller. Measured currently
 prev_control_act = 0                        # determined output for the controller. Previous measurement
-control_gain = 0.42                         # controller gain. Preliminary values from C Falero testing
-control_zero = 0.9888                       # controller zero. Preliminary values from C Falero testing
-control_gain_static = 0.15195               # controller gain. Preliminary values from C Falero testing
-control_zero_static = 0.922                 # controller zero. Preliminary values from C Falero testing
+control_gain = 0.42                         # dynamic controller gain. Preliminary values from C Falero testing
+control_zero = 0.9888                       # dynamic controller zero. Preliminary values from C Falero testing
+control_gain_static = 0.04027               # static controller gain. Preliminary values from C Ramirez testing
+control_zero_static = 0.902                 # static controller zero. Preliminary values from C Ramirez testing
 bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
 bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
 # ========================================= #
@@ -133,17 +133,18 @@ bts_enable_pin.value = 0
 
 # Verifies throttle inputs and adjust driver output accordingly.
 # Serviced by "throttle" thread.
+# PWM/ADC Ratio = (throttle_sens_pin.value - Throttle_min) * (1/((Throttle_max-Throttle_min)/Vref_ADC))
 # ============================================= #
 def adjust_throttle():
     global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm
     if not is_cruise_on:
         # if is_throttle_active_pin:
-        if throttle_sens_pin.value > 0.15:
+        if throttle_sens_pin.value > 0.16:
             bts_enable_pin.value = 1
         else:
             bts_enable_pin.value = 0
         prev_pwm = pwm_duty_cycle
-        pwm_duty_cycle = (throttle_sens_pin.value - 0.15) * 1.96
+        pwm_duty_cycle = (throttle_sens_pin.value - 0.16) * 1.974
         if pwm_duty_cycle <= 0:
             pwm_duty_cycle = 0
         elif pwm_duty_cycle > 1:
@@ -188,6 +189,7 @@ def bat_lvl_check():
     else:
         # print("low battery")
         # TODO: Determine if charger is connected to automatically close popup
+        # TODO: Stop bts until charge level improves
         bat_lvl_val = bat_lvl_0
         battery_info_img.value = bat_lvl_val
         bat_blink = False
