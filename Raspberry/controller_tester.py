@@ -20,21 +20,23 @@ class PiThread (threading.Thread):
         self.thread_name = thread_name
 
     def run(self):
+        global cruise_set_spd, begin_test, cruise_set_rpm
         if self.thread_name is "status":
             while True:
                 if not system_stop:
                     if bat_blink:
                         battery_info_img.value = bat_lvl_1
-                        time.sleep(0.5)
+                        time.sleep(0.25)
                         battery_info_img.value = bat_lvl_0
-                        time.sleep(0.5)
+                        time.sleep(0.25)
                     else:
-                        time.sleep(1)
+                        time.sleep(0.5)
                     cruise_state_check()
                     sys_voltage_check()
                     sys_current_check()
                     bat_lvl_check()
                     mph_display()
+                    # print(bts_enable_pin.value)
 
         elif self.thread_name is "comms":
             sio = socketio.Client()
@@ -57,11 +59,44 @@ class PiThread (threading.Thread):
                 if not system_stop:
                     adjust_throttle()
                     time.sleep(0.1)
+
         elif self.thread_name is "control":
             while True:
                 if not system_stop:
+                    # pi_control()
                     pi_control_static()
                     time.sleep(0.01)
+
+        elif self.thread_name is "test":
+            while True:
+                if begin_test:
+                    f = open("/home/pi/Documents/CCET/dynamic_test_4_17_2021("+str(num_test)+").csv", 'a')
+                    f.write("{x:.3f}, {y:.3f}, {z:.3f}, {w:.3f}, {v:.3f}\n".format(x=time.time()-test_start,
+                                                                                   y=control_act, z=cruise_set_spd,
+                                                                                   w=rpm_val, v=mph_val))
+                    f.close()
+                    time.sleep(0.01)
+        elif self.thread_name is "mph":
+            while True:
+                if begin_test:
+                    time.sleep(10)
+                    if cruise_set_spd < 7 and is_cruise_on:
+                        cruise_set_spd = cruise_set_spd + 1
+                        cruise_set_rpm = cruise_set_rpm + 12.93
+                        set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
+                        time.sleep(30)
+                    # if cruise_set_spd < 7 and is_cruise_on:
+                    #     cruise_set_spd = cruise_set_spd + 1
+                    #     cruise_set_rpm = cruise_set_rpm + 12.93
+                    #     set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
+                    #     time.sleep(10)
+                    # if cruise_set_spd > 1 and is_cruise_on:
+                    #     cruise_set_spd = cruise_set_spd - 2
+                    #     cruise_set_rpm = cruise_set_rpm - 25.86
+                    #     set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
+                    #     time.sleep(10)
+                    if is_cruise_on:
+                        cruise_set_btn()
 # ============================================= #
 
 
@@ -118,12 +153,15 @@ control_err = 0                             # difference between set speed and a
 prev_control_err = 0                        # difference between set speed and actual speed. Previous measurement
 control_act = 0                             # determined output for the controller. Measured currently
 prev_control_act = 0                        # determined output for the controller. Previous measurement
-control_gain = 0.42                         # dynamic controller gain. Preliminary values from C Falero testing
-control_zero = 0.9888                       # dynamic controller zero. Preliminary values from C Falero testing
-control_gain_static = 0.04027               # static controller gain. Preliminary values from C Ramirez testing
-control_zero_static = 0.902                 # static controller zero. Preliminary values from C Ramirez testing
+control_gain = 0.5                         # controller gain. Preliminary values from C Falero testing
+control_zero = 0.9888                       # controller zero. Preliminary values from C Falero testing
+control_gain_static = 0.04027               # controller gain. Preliminary values from C Ramirez testing
+control_zero_static = 0.902                 # controller zero. Preliminary values from C Ramirez testing
 bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
 bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
+begin_test = False
+num_test = 1
+test_start = 0
 # ========================================= #
 
 # ==============Enables==================== #
@@ -141,10 +179,12 @@ def adjust_throttle():
         # if is_throttle_active_pin:
         if throttle_sens_pin.value > 0.16:
             bts_enable_pin.value = 1
+            # print("Angel no sabe hacer las cosas bien")
         else:
             bts_enable_pin.value = 0
         prev_pwm = pwm_duty_cycle
         pwm_duty_cycle = (throttle_sens_pin.value - 0.16) * 1.974
+        # pwm_duty_cycle = (throttle_sens_pin.value - 0.15) * 1.96
         if pwm_duty_cycle <= 0:
             pwm_duty_cycle = 0
         elif pwm_duty_cycle > 1:
@@ -189,7 +229,6 @@ def bat_lvl_check():
     else:
         # print("low battery")
         # TODO: Determine if charger is connected to automatically close popup
-        # TODO: Stop bts until charge level improves
         bat_lvl_val = bat_lvl_0
         battery_info_img.value = bat_lvl_val
         bat_blink = False
@@ -297,8 +336,10 @@ def p_control():
 # Serviced by main thread via interrupts
 # ============================================= #
 def cruise_set_btn():
-    global cruise_set_spd, is_cruise_on, mph_val, cruise_set_rpm
+    global cruise_set_spd, is_cruise_on, mph_val, cruise_set_rpm, begin_test, num_test, test_start
     if is_cruise_on:
+        begin_test = False
+        num_test = num_test + 1
         stop_cruise()
     else:
         if 3 <= mph_val <= 7:    # if less than 3mph, can't activate
@@ -306,6 +347,11 @@ def cruise_set_btn():
             cruise_set_spd = mph_val
             cruise_set_rpm = rpm_val
             set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
+            f = open("/home/pi/Documents/CCET/dynamic_4_17_2021("+str(num_test)+").csv", 'w')
+            f.write("Time(s), Control Action, Set Speed(mph), RPM Out, MPH Out\n")
+            f.close()
+            test_start = time.time()
+            begin_test = True
 # ============================================= #
 
 
@@ -416,7 +462,7 @@ def reduce_to_zero():
     # print(time.time()-start_time)
     if time.time()-start_time > 1:
         while mph_val > 0:
-            if throttle_sens_pin.value > 0.155 or mph_val < cruise_set_spd:
+            if throttle_sens_pin.value > 0.16 or mph_val < cruise_set_spd:
                 break
             mph_val = mph_val - 0.3
             if mph_val < 0:
@@ -441,11 +487,12 @@ def rpm_count():
 # Auxiliary method to stop cruise functionality
 # ============================================= #
 def stop_cruise():
-    global is_cruise_on, cruise_set_spd, pwm_duty_cycle, pwm_out_pin, set_spd
+    global is_cruise_on, cruise_set_spd, pwm_duty_cycle, pwm_out_pin, set_spd, cruise_set_rpm
     is_cruise_on = False
     bts_enable_pin.value = 0
     time.sleep(0.5)
     cruise_set_spd = 0
+    cruise_set_rpm = 0
     set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
     print('Cruise Stopped')
     pwm_duty_cycle = 0
@@ -458,7 +505,7 @@ def stop_cruise():
 # ============================================= #
 def sys_current_check():
     global i_sensor_val
-    i_sensor_val = ((curr_sens_pin.value - 0.5) * 6) / 66
+    i_sensor_val = ((curr_sens_pin.value * 6) - 2.5) / 0.066
     # print("System Current: {x:.4f}A".format(x=i_sensor_val))
 # ============================================= #
 
@@ -537,11 +584,18 @@ status_thread = PiThread(1, "status")
 control_thread = PiThread(2, "control")
 comms_thread = PiThread(3, "comms")
 throttle_thread = PiThread(4, "throttle")
+test_thread = PiThread(5, "test")
+mph_thread = PiThread(6, "mph")
 
 status_thread.start()
 control_thread.start()
-comms_thread.start()
+# comms_thread.start()
+
+
+
 throttle_thread.start()
+test_thread.start()
+mph_thread.start()
 # =========================================== #
 
 # =================Interrupts============== #
