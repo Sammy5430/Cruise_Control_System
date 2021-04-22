@@ -97,6 +97,8 @@ motor_volt_sens_pin = MCP3008(channel=3, max_voltage=6)  # used for testing
 # ===============Variables================= #
 is_cruise_on = False                        # flag for cruise on/off
 magnet_count = 0                            # times magnet has passed hall sensor
+deadband_throttle=1/6                       # sets the throttle to start reading after 1 Volts
+current_sensitivity=0.066                   # Current sensor sensitivity
 rpm_val = 0                                 # latest RPM measurement
 prev_rpm_val = 0                            # previous RPM measurement(used for average measurements)
 mph_val = 0                                 # actual speed
@@ -118,8 +120,8 @@ control_err = 0                             # difference between set speed and a
 prev_control_err = 0                        # difference between set speed and actual speed. Previous measurement
 control_act = 0                             # determined output for the controller. Measured currently
 prev_control_act = 0                        # determined output for the controller. Previous measurement
-control_gain = 0.42                         # dynamic controller gain. Preliminary values from C Falero testing
-control_zero = 0.9888                       # dynamic controller zero. Preliminary values from C Falero testing
+control_gain = 1.2789                         # dynamic controller gain. Preliminary values from C Falero testing
+control_zero = 0.988                       # dynamic controller zero. Preliminary values from C Falero testing
 control_gain_static = 0.04027               # static controller gain. Preliminary values from C Ramirez testing
 control_zero_static = 0.902                 # static controller zero. Preliminary values from C Ramirez testing
 bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
@@ -133,18 +135,21 @@ bts_enable_pin.value = 0
 
 # Verifies throttle inputs and adjust driver output accordingly.
 # Serviced by "throttle" thread.
-# PWM/ADC Ratio = (throttle_sens_pin.value - Throttle_min) * (1/((Throttle_max-Throttle_min)/Vref_ADC))
+# Sets the throttle deadband depending on the actual speed to prevent motor stoping the momentum of the tricycle
+# PWM/ADC Ratio = (throttle_sens_pin.value - Throttle_min) * (1/((Throttle_max/Vref_ADC)-Throttle_min))
 # ============================================= #
 def adjust_throttle():
-    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm
+    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm, deadband_throttle
     if not is_cruise_on:
         # if is_throttle_active_pin:
-        if throttle_sens_pin.value > 0.16:
+        deadband_throttle=deadband_throttle + (mph_val/10)          # Increase deadband in relation to actual speed
+        if throttle_sens_pin.value > deadband_throttle:
             bts_enable_pin.value = 1
         else:
             bts_enable_pin.value = 0
         prev_pwm = pwm_duty_cycle
-        pwm_duty_cycle = (throttle_sens_pin.value - 0.16) * 1.974
+        pwm_duty_cycle = (throttle_sens_pin.value - deadband_throttle) * (1/((4/6)-deadband_throttle)
+        pwm_duty_cycle = pwm_duty_cycle + mph_val                   # Increase PWM to match tricycle speed
         if pwm_duty_cycle <= 0:
             pwm_duty_cycle = 0
         elif pwm_duty_cycle > 1:
@@ -458,7 +463,7 @@ def stop_cruise():
 # ============================================= #
 def sys_current_check():
     global i_sensor_val
-    i_sensor_val = ((curr_sens_pin.value - 0.5) * 6) / 66
+    i_sensor_val = ((curr_sens_pin.value + (curr_sens_pin.value*0.015)) * 6)-2.47) / current_sensitivity
     # print("System Current: {x:.4f}A".format(x=i_sensor_val))
 # ============================================= #
 
