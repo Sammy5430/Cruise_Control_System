@@ -1,6 +1,7 @@
 import time
 import threading
 import socketio
+from pynput.keyboard import Key, Controller
 from guizero import App, Text, Box, Picture
 from gpiozero import MCP3008, Button, PWMOutputDevice, DigitalOutputDevice, DigitalInputDevice
 
@@ -70,7 +71,7 @@ class PiThread (threading.Thread):
         elif self.thread_name is "test":
             while True:
                 if begin_test:
-                    f = open("/home/pi/Documents/CCET/dynamic_test_4_17_2021("+str(num_test)+").csv", 'a')
+                    f = open("/home/pi/Documents/CCET/dynamic_test_4_22_2021("+str(num_test)+").csv", 'a')
                     f.write("{x:.3f}, {y:.3f}, {z:.3f}, {w:.3f}, {v:.3f}\n".format(x=time.time()-test_start,
                                                                                    y=control_act, z=cruise_set_spd,
                                                                                    w=rpm_val, v=mph_val))
@@ -132,6 +133,8 @@ motor_volt_sens_pin = MCP3008(channel=3, max_voltage=6)  # used for testing
 # ===============Variables================= #
 is_cruise_on = False                        # flag for cruise on/off
 magnet_count = 0                            # times magnet has passed hall sensor
+deadband_throttle = (1/6)                   # sets the throttle to start reading after 1 Volts
+current_sensitivity = 0.066                 # Current sensor sensitivity
 rpm_val = 0                                 # latest RPM measurement
 prev_rpm_val = 0                            # previous RPM measurement(used for average measurements)
 mph_val = 0                                 # actual speed
@@ -162,6 +165,7 @@ bat_measure_cnt = 0                         # count of battery measurements. Use
 begin_test = False
 num_test = 1
 test_start = 0
+keyboard = Controller()
 # ========================================= #
 
 # ==============Enables==================== #
@@ -174,17 +178,16 @@ bts_enable_pin.value = 0
 # PWM/ADC Ratio = (throttle_sens_pin.value - Throttle_min) * (1/((Throttle_max-Throttle_min)/Vref_ADC))
 # ============================================= #
 def adjust_throttle():
-    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm
+    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm, deadband_throttle
     if not is_cruise_on:
-        # if is_throttle_active_pin:
-        if throttle_sens_pin.value > 0.16:
+        deadband_throttle=deadband_throttle + (mph_val/10)          # Increase deadband in relation to actual speed
+        if throttle_sens_pin.value > deadband_throttle:
             bts_enable_pin.value = 1
-            # print("Angel no sabe hacer las cosas bien")
         else:
             bts_enable_pin.value = 0
         prev_pwm = pwm_duty_cycle
-        pwm_duty_cycle = (throttle_sens_pin.value - 0.16) * 1.974
-        # pwm_duty_cycle = (throttle_sens_pin.value - 0.15) * 1.96
+        pwm_duty_cycle = (throttle_sens_pin.value - deadband_throttle) * (1/((4/6)-deadband_throttle))
+        pwm_duty_cycle = pwm_duty_cycle + mph_val                   # Increase PWM to match tricycle speed
         if pwm_duty_cycle <= 0:
             pwm_duty_cycle = 0
         elif pwm_duty_cycle > 1:
@@ -347,7 +350,7 @@ def cruise_set_btn():
             cruise_set_spd = mph_val
             cruise_set_rpm = rpm_val
             set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
-            f = open("/home/pi/Documents/CCET/dynamic_4_17_2021("+str(num_test)+").csv", 'w')
+            f = open("/home/pi/Documents/CCET/dynamic_4_22_2021("+str(num_test)+").csv", 'w')
             f.write("Time(s), Control Action, Set Speed(mph), RPM Out, MPH Out\n")
             f.close()
             test_start = time.time()
@@ -410,10 +413,12 @@ def kill_btn():
     stop_cruise()
     system_stop = True
     print("murio")
+    app.warn(title="Warning", text="Emergency stop triggered. Release safety switch to continue.")
     btn_kill_pin.wait_for_inactive()
+    keyboard.press(Key.enter)
+    keyboard.release(Key.enter)
     print("revivio")
     system_stop = False
-    # popup
 # ============================================= #
 
 
@@ -453,7 +458,6 @@ def pwm_inc():
 # ============================================= #
 
 
-# TODO: verify is_throttle_active_pin
 # Reduces MPH measurements to 0 gradually when the sensors stops detecting magnets
 # Serviced by "throttle" thread
 # ============================================= #
@@ -505,7 +509,7 @@ def stop_cruise():
 # ============================================= #
 def sys_current_check():
     global i_sensor_val
-    i_sensor_val = ((curr_sens_pin.value * 6) - 2.5) / 0.066
+    i_sensor_val = (((curr_sens_pin.value + (curr_sens_pin.value*0.015)) * 6)-2.47) / current_sensitivity
     # print("System Current: {x:.4f}A".format(x=i_sensor_val))
 # ============================================= #
 
@@ -595,7 +599,7 @@ control_thread.start()
 
 throttle_thread.start()
 test_thread.start()
-mph_thread.start()
+# mph_thread.start()
 # =========================================== #
 
 # =================Interrupts============== #

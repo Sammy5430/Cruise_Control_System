@@ -1,6 +1,7 @@
 import time
 import threading
 import socketio
+from pynput.keyboard import Key, Controller
 from guizero import App, Text, Box, Picture
 from gpiozero import MCP3008, Button, PWMOutputDevice, DigitalOutputDevice, DigitalInputDevice
 
@@ -46,7 +47,7 @@ class PiThread (threading.Thread):
                     'Cruise State': is_cruise_on,
                     'Set Speed': cruise_set_spd,
                     'Actual Speed': mph_val,
-                    'Current': i_sensor_val,      # TODO: Convert to I measurement
+                    'Current': i_sensor_val,
                     'Time': t
                 })
                 time.sleep(1)
@@ -97,8 +98,8 @@ motor_volt_sens_pin = MCP3008(channel=3, max_voltage=6)  # used for testing
 # ===============Variables================= #
 is_cruise_on = False                        # flag for cruise on/off
 magnet_count = 0                            # times magnet has passed hall sensor
-deadband_throttle=1/6                       # sets the throttle to start reading after 1 Volts
-current_sensitivity=0.066                   # Current sensor sensitivity
+deadband_throttle = (1/6)                   # sets the throttle to start reading after 1 Volts
+current_sensitivity = 0.066                 # Current sensor sensitivity
 rpm_val = 0                                 # latest RPM measurement
 prev_rpm_val = 0                            # previous RPM measurement(used for average measurements)
 mph_val = 0                                 # actual speed
@@ -126,6 +127,7 @@ control_gain_static = 0.04027               # static controller gain. Preliminar
 control_zero_static = 0.902                 # static controller zero. Preliminary values from C Ramirez testing
 bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
 bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
+keyboard = Controller()
 # ========================================= #
 
 # ==============Enables==================== #
@@ -141,29 +143,23 @@ bts_enable_pin.value = 0
 def adjust_throttle():
     global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm, deadband_throttle
     if not is_cruise_on:
-        # if is_throttle_active_pin:
         deadband_throttle=deadband_throttle + (mph_val/10)          # Increase deadband in relation to actual speed
         if throttle_sens_pin.value > deadband_throttle:
             bts_enable_pin.value = 1
         else:
             bts_enable_pin.value = 0
         prev_pwm = pwm_duty_cycle
-        pwm_duty_cycle = (throttle_sens_pin.value - deadband_throttle) * (1/((4/6)-deadband_throttle)
+        pwm_duty_cycle = (throttle_sens_pin.value - deadband_throttle) * (1/((4/6)-deadband_throttle))
         pwm_duty_cycle = pwm_duty_cycle + mph_val                   # Increase PWM to match tricycle speed
         if pwm_duty_cycle <= 0:
             pwm_duty_cycle = 0
         elif pwm_duty_cycle > 1:
             pwm_duty_cycle = 1
-        # print(throttle_sens_pin.value)
-        # print(is_throttle_active_pin.value)
-        # print(bts_enable_pin.value)
         pwm_out_pin.value = pwm_duty_cycle
     reduce_to_zero()
 # ============================================= #
 
 
-# TODO: Adjust percentage based on motor operation %
-# TODO: Calibrate final implementation
 # Uses measured system voltage to adjust battery charge icon in GUI.
 # Serviced by "status" thread.
 # ============================================= #
@@ -365,14 +361,16 @@ def inc_speed_btn():
 # Serviced by main thread via interrupts.
 # ============================================= #
 def kill_btn():
-    global pwm_duty_cycle, cruise_set_spd, system_stop
+    global pwm_duty_cycle, cruise_set_spd, system_stop, app
     stop_cruise()
     system_stop = True
     print("murio")
+    app.warn(title="Warning", text="Emergency stop triggered. Release safety switch to continue.")
     btn_kill_pin.wait_for_inactive()
+    keyboard.press(Key.enter)
+    keyboard.release(Key.enter)
     print("revivio")
     system_stop = False
-    # popup
 # ============================================= #
 
 
@@ -412,16 +410,14 @@ def pwm_inc():
 # ============================================= #
 
 
-# TODO: verify is_throttle_active_pin
 # Reduces MPH measurements to 0 gradually when the sensors stops detecting magnets
 # Serviced by "throttle" thread
 # ============================================= #
 def reduce_to_zero():
     global is_throttle_active_pin, mph_val, start_time, cruise_set_spd
-    # print(time.time()-start_time)
     if time.time()-start_time > 1:
         while mph_val > 0:
-            if throttle_sens_pin.value > 0.155 or mph_val < cruise_set_spd:
+            if throttle_sens_pin.value > 0.16 or mph_val < cruise_set_spd:
                 break
             mph_val = mph_val - 0.3
             if mph_val < 0:
@@ -446,11 +442,12 @@ def rpm_count():
 # Auxiliary method to stop cruise functionality
 # ============================================= #
 def stop_cruise():
-    global is_cruise_on, cruise_set_spd, pwm_duty_cycle, pwm_out_pin, set_spd
+    global is_cruise_on, cruise_set_spd, pwm_duty_cycle, pwm_out_pin, set_spd, cruise_set_rpm
     is_cruise_on = False
     bts_enable_pin.value = 0
     time.sleep(0.5)
     cruise_set_spd = 0
+    cruise_set_rpm = 0
     set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
     print('Cruise Stopped')
     pwm_duty_cycle = 0
@@ -463,7 +460,7 @@ def stop_cruise():
 # ============================================= #
 def sys_current_check():
     global i_sensor_val
-    i_sensor_val = ((curr_sens_pin.value + (curr_sens_pin.value*0.015)) * 6)-2.47) / current_sensitivity
+    i_sensor_val = (((curr_sens_pin.value + (curr_sens_pin.value*0.015)) * 6)-2.47) / current_sensitivity
     # print("System Current: {x:.4f}A".format(x=i_sensor_val))
 # ============================================= #
 
