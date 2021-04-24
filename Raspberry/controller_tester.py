@@ -1,7 +1,7 @@
 import time
 import threading
 import socketio
-from pynput.keyboard import Key, Controller
+# from pynput.keyboard import Key, Controller
 from guizero import App, Text, Box, Picture
 from gpiozero import MCP3008, Button, PWMOutputDevice, DigitalOutputDevice, DigitalInputDevice
 
@@ -41,7 +41,7 @@ class PiThread (threading.Thread):
 
         elif self.thread_name is "comms":
             sio = socketio.Client()
-            sio.connect('http://10.31.1.13:3000')
+            sio.connect('http://10.31.1.255:3000')
             t = 0
             while True:
                 sio.emit('data_update', {
@@ -52,8 +52,8 @@ class PiThread (threading.Thread):
                     'Current': i_sensor_val,      # TODO: Convert to I measurement
                     'Time': t
                 })
-                time.sleep(1)
-                t = t+1
+                time.sleep(0.2)
+                t = t + 0.2
 
         elif self.thread_name is "throttle":
             while True:
@@ -64,8 +64,8 @@ class PiThread (threading.Thread):
         elif self.thread_name is "control":
             while True:
                 if not system_stop:
-                    # pi_control()
-                    pi_control_static()
+                    pi_control()
+                    # pi_control_static()
                     time.sleep(0.01)
 
         elif self.thread_name is "test":
@@ -156,16 +156,16 @@ control_err = 0                             # difference between set speed and a
 prev_control_err = 0                        # difference between set speed and actual speed. Previous measurement
 control_act = 0                             # determined output for the controller. Measured currently
 prev_control_act = 0                        # determined output for the controller. Previous measurement
-control_gain = 0.5                         # controller gain. Preliminary values from C Falero testing
-control_zero = 0.9888                       # controller zero. Preliminary values from C Falero testing
+control_gain = 0.88                      # controller gain. Preliminary values from C Falero testing
+control_zero = 0.988                       # controller zero. Preliminary values from C Falero testing
 control_gain_static = 0.04027               # controller gain. Preliminary values from C Ramirez testing
 control_zero_static = 0.902                 # controller zero. Preliminary values from C Ramirez testing
 bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
 bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
 begin_test = False
-num_test = 1
+num_test = 4
 test_start = 0
-keyboard = Controller()
+# keyboard = Controller()
 # ========================================= #
 
 # ==============Enables==================== #
@@ -178,16 +178,15 @@ bts_enable_pin.value = 0
 # PWM/ADC Ratio = (throttle_sens_pin.value - Throttle_min) * (1/((Throttle_max-Throttle_min)/Vref_ADC))
 # ============================================= #
 def adjust_throttle():
-    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm, deadband_throttle
+    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm
     if not is_cruise_on:
-        deadband_throttle=deadband_throttle + (mph_val/10)          # Increase deadband in relation to actual speed
-        if throttle_sens_pin.value > deadband_throttle:
+        # if is_throttle_active_pin:
+        if throttle_sens_pin.value > 0.16:
             bts_enable_pin.value = 1
         else:
             bts_enable_pin.value = 0
         prev_pwm = pwm_duty_cycle
-        pwm_duty_cycle = (throttle_sens_pin.value - deadband_throttle) * (1/((4/6)-deadband_throttle))
-        pwm_duty_cycle = pwm_duty_cycle + mph_val                   # Increase PWM to match tricycle speed
+        pwm_duty_cycle = (throttle_sens_pin.value - 0.16) * 1.9737
         if pwm_duty_cycle <= 0:
             pwm_duty_cycle = 0
         elif pwm_duty_cycle > 1:
@@ -256,44 +255,15 @@ def brake_press():
 # Serviced by "control" thread
 # ============================================= #
 def pi_control():
-    global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on, prev_pwm, control_err, control_act, control_gain, \
-        prev_control_act, prev_control_err, control_zero
-    if is_cruise_on:
-        prev_pwm = pwm_duty_cycle
-        if not bts_enable_pin.value:
-            bts_enable_pin.value = 1
-        control_err = cruise_set_spd - mph_val
-        control_act = (control_err * control_gain) - (prev_control_err * control_gain * control_zero) + prev_control_act
-        if control_act < 0:
-            control_act = 0
-        elif control_act > 24:
-            control_act = 24
-        pwm_duty_cycle = (control_act/24)
-        if pwm_duty_cycle > 1:
-            pwm_duty_cycle = 1
-        prev_control_err = control_err
-        prev_control_act = control_act
-        pwm_out_pin.value = pwm_duty_cycle
-    else:
-        prev_control_err = mph_val
-        prev_control_act = prev_pwm * 24
-# ============================================= #
-
-
-# Proportional Integral Controller implementation for static demonstrations.
-# Uses measured mph and set mph to automatically adjust driver output.
-# Serviced by "control" thread
-# ============================================= #
-def pi_control_static():
     global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on, prev_pwm, control_err, control_act, \
-        control_gain_static, prev_control_act, prev_control_err, control_zero_static, cruise_set_rpm
+        control_gain, prev_control_act, prev_control_err, control_zero, cruise_set_rpm
     if is_cruise_on:
         prev_pwm = pwm_duty_cycle
         if not bts_enable_pin.value:
             bts_enable_pin.value = 1
         control_err = cruise_set_rpm - rpm_val
-        control_act = (control_err * control_gain_static) - (prev_control_err * control_gain_static *
-                                                             control_zero_static) + prev_control_act
+        control_act = (control_err * control_gain) - (prev_control_err * control_gain *
+                                                      control_zero) + prev_control_act
         if control_act < 0:
             control_act = 0
         elif control_act > 24:
@@ -307,6 +277,36 @@ def pi_control_static():
     else:
         prev_control_err = rpm_val
         prev_control_act = prev_pwm * 24
+# ============================================= #
+
+
+# Proportional Integral Controller implementation for static demonstrations.
+# Uses measured mph and set mph to automatically adjust driver output.
+# Serviced by "control" thread
+# ============================================= #
+# def pi_control_static():
+#     global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on, prev_pwm, control_err, control_act, \
+#         control_gain_static, prev_control_act, prev_control_err, control_zero_static, cruise_set_rpm
+#     if is_cruise_on:
+#         prev_pwm = pwm_duty_cycle
+#         if not bts_enable_pin.value:
+#             bts_enable_pin.value = 1
+#         control_err = cruise_set_rpm - rpm_val
+#         control_act = (control_err * control_gain_static) - (prev_control_err * control_gain_static *
+#                                                              control_zero_static) + prev_control_act
+#         if control_act < 0:
+#             control_act = 0
+#         elif control_act > 24:
+#             control_act = 24
+#         pwm_duty_cycle = (control_act/24)
+#         if pwm_duty_cycle > 1:
+#             pwm_duty_cycle = 1
+#         prev_control_err = control_err
+#         prev_control_act = control_act
+#         pwm_out_pin.value = pwm_duty_cycle
+#     else:
+#         prev_control_err = rpm_val
+#         prev_control_act = prev_pwm * 24
 # ============================================= #
 
 # Proportional Controller implementation.
@@ -350,7 +350,7 @@ def cruise_set_btn():
             cruise_set_spd = mph_val
             cruise_set_rpm = rpm_val
             set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
-            f = open("/home/pi/Documents/CCET/dynamic_4_22_2021("+str(num_test)+").csv", 'w')
+            f = open("/home/pi/Documents/CCET/dynamic_test_4_22_2021("+str(num_test)+").csv", 'w')
             f.write("Time(s), Control Action, Set Speed(mph), RPM Out, MPH Out\n")
             f.close()
             test_start = time.time()
@@ -415,8 +415,8 @@ def kill_btn():
     print("murio")
     app.warn(title="Warning", text="Emergency stop triggered. Release safety switch to continue.")
     btn_kill_pin.wait_for_inactive()
-    keyboard.press(Key.enter)
-    keyboard.release(Key.enter)
+    # keyboard.press(Key.enter)
+    # keyboard.release(Key.enter)
     print("revivio")
     system_stop = False
 # ============================================= #
@@ -468,11 +468,11 @@ def reduce_to_zero():
         while mph_val > 0:
             if throttle_sens_pin.value > 0.16 or mph_val < cruise_set_spd:
                 break
-            mph_val = mph_val - 0.3
+            mph_val = mph_val - 0.1
             if mph_val < 0:
                 mph_val = 0
             cur_spd.value = "{x:.1f} mph".format(x=mph_val)
-            time.sleep(0.15)
+            time.sleep(0.05)
 # ============================================= #
 
 
@@ -563,6 +563,7 @@ cruise_info_img = Picture(cruise_info_box, image=cruise_lvl_val, width=70,
                           height=70, align="right")
 cruise_info_text = Text(cruise_info_box, text="Cruise Control:", color="white", size=24, height=2)
 
+# TODO: Add controller mode (static/dynamic)
 battery_info_box = Box(info_box, height="fill", width="fill", align="right", border=False)
 battery_info_img_padding = Text(battery_info_box, text=" ", color="white", size=24, height=2, align='right')
 battery_info_img = Picture(battery_info_box, image=bat_lvl_val, width=120,
@@ -593,10 +594,7 @@ mph_thread = PiThread(6, "mph")
 
 status_thread.start()
 control_thread.start()
-# comms_thread.start()
-
-
-
+comms_thread.start()
 throttle_thread.start()
 test_thread.start()
 # mph_thread.start()

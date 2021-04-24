@@ -1,7 +1,7 @@
 import time
 import threading
 import socketio
-from pynput.keyboard import Key, Controller
+# from pynput.keyboard import Key, Controller
 from guizero import App, Text, Box, Picture
 from gpiozero import MCP3008, Button, PWMOutputDevice, DigitalOutputDevice, DigitalInputDevice
 
@@ -39,7 +39,7 @@ class PiThread (threading.Thread):
 
         elif self.thread_name is "comms":
             sio = socketio.Client()
-            sio.connect('http://10.31.1.13:3000')
+            sio.connect('http://10.31.1.255:3000')
             t = 0
             while True:
                 sio.emit('data_update', {
@@ -50,8 +50,8 @@ class PiThread (threading.Thread):
                     'Current': i_sensor_val,
                     'Time': t
                 })
-                time.sleep(1)
-                t = t+1
+                time.sleep(0.5)
+                t = t+0.5
 
         elif self.thread_name is "throttle":
             while True:
@@ -99,6 +99,7 @@ motor_volt_sens_pin = MCP3008(channel=3, max_voltage=6)  # used for testing
 is_cruise_on = False                        # flag for cruise on/off
 magnet_count = 0                            # times magnet has passed hall sensor
 deadband_throttle = (1/6)                   # sets the throttle to start reading after 1 Volts
+deadband_throttle_set = 0                   # adjusted value of deadband
 current_sensitivity = 0.066                 # Current sensor sensitivity
 rpm_val = 0                                 # latest RPM measurement
 prev_rpm_val = 0                            # previous RPM measurement(used for average measurements)
@@ -127,7 +128,7 @@ control_gain_static = 0.04027               # static controller gain. Preliminar
 control_zero_static = 0.902                 # static controller zero. Preliminary values from C Ramirez testing
 bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
 bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
-keyboard = Controller()
+# keyboard = Controller()
 # ========================================= #
 
 # ==============Enables==================== #
@@ -141,21 +142,28 @@ bts_enable_pin.value = 0
 # PWM/ADC Ratio = (throttle_sens_pin.value - Throttle_min) * (1/((Throttle_max/Vref_ADC)-Throttle_min))
 # ============================================= #
 def adjust_throttle():
-    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm, deadband_throttle
+    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm, deadband_throttle, deadband_throttle_set, mph_val
     if not is_cruise_on:
-        deadband_throttle=deadband_throttle + (mph_val/10)          # Increase deadband in relation to actual speed
-        if throttle_sens_pin.value > deadband_throttle:
+        if mph_val > 0.1:
+            deadband_throttle_set = deadband_throttle + ((mph_val/9) - 0.01)  # Increase throttle deadband based on actual speed
+        else:
+            deadband_throttle_set = deadband_throttle
+        if throttle_sens_pin.value > deadband_throttle_set:
             bts_enable_pin.value = 1
         else:
             bts_enable_pin.value = 0
         prev_pwm = pwm_duty_cycle
+        # pwm_duty_cycle = (throttle_sens_pin.value - deadband_throttle_set) * (1/((4/6)-deadband_throttle_set))
         pwm_duty_cycle = (throttle_sens_pin.value - deadband_throttle) * (1/((4/6)-deadband_throttle))
-        pwm_duty_cycle = pwm_duty_cycle + mph_val                   # Increase PWM to match tricycle speed
+        # pwm_duty_cycle = pwm_duty_cycle + ((mph_val/10) - 0.02)                 # Increase PWM to match tricycle speed
+        pwm_duty_cycle = pwm_duty_cycle               # Increase PWM to match tricycle speed
+
         if pwm_duty_cycle <= 0:
             pwm_duty_cycle = 0
         elif pwm_duty_cycle > 1:
             pwm_duty_cycle = 1
         pwm_out_pin.value = pwm_duty_cycle
+        # print(deadband_throttle_set)
     reduce_to_zero()
 # ============================================= #
 
@@ -367,8 +375,8 @@ def kill_btn():
     print("murio")
     app.warn(title="Warning", text="Emergency stop triggered. Release safety switch to continue.")
     btn_kill_pin.wait_for_inactive()
-    keyboard.press(Key.enter)
-    keyboard.release(Key.enter)
+    # keyboard.press(Key.enter)
+    # keyboard.release(Key.enter)
     print("revivio")
     system_stop = False
 # ============================================= #
@@ -417,7 +425,7 @@ def reduce_to_zero():
     global is_throttle_active_pin, mph_val, start_time, cruise_set_spd
     if time.time()-start_time > 1:
         while mph_val > 0:
-            if throttle_sens_pin.value > 0.16 or mph_val < cruise_set_spd:
+            if throttle_sens_pin.value > deadband_throttle or mph_val < cruise_set_spd:
                 break
             mph_val = mph_val - 0.3
             if mph_val < 0:
@@ -510,14 +518,13 @@ info_box = Box(app, width="fill", align="bottom", border=False)
 
 cruise_info_box = Box(info_box, height="fill", width="fill", align="left", border=False)
 cruise_info_img_padding = Text(cruise_info_box, text="    ", color="white", size=24, height=2, align='right')
-cruise_info_img = Picture(cruise_info_box, image=cruise_lvl_val, width=70,
-                          height=70, align="right")
+cruise_info_img = Picture(cruise_info_box, image=cruise_lvl_val, width=70, height=70, align="right")
 cruise_info_text = Text(cruise_info_box, text="Cruise Control:", color="white", size=24, height=2)
 
+# TODO: Add controller mode (static/dynamic)
 battery_info_box = Box(info_box, height="fill", width="fill", align="right", border=False)
 battery_info_img_padding = Text(battery_info_box, text=" ", color="white", size=24, height=2, align='right')
-battery_info_img = Picture(battery_info_box, image=bat_lvl_val, width=120,
-                           height=60, align="right")
+battery_info_img = Picture(battery_info_box, image=bat_lvl_val, width=120, height=60, align="right")
 battery_info_text = Text(battery_info_box, text="Battery:", color="white", size=24, height=2)
 
 set_spd_box = Box(app, width="fill", height="fill", align="left", border=True)
