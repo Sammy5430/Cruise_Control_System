@@ -52,11 +52,12 @@ function newSpeedGauge(renderLocation){
         colorNeedleEnd: "red",
         animationDuration: 1000,
         animationRule: "linear",
-        colorValueText: "aqua",
-        colorValueBoxBackground: "#363636",
-        valueBoxStroke: false,
-        valueInt: 1,
-        valueDec: 2,
+        valueBox: false
+        // colorValueText: "aqua",
+        // colorValueBoxBackground: "#363636",
+        // valueBoxStroke: false,
+        // valueInt: 1,
+        // valueDec: 2,
     })
 }
 
@@ -127,6 +128,7 @@ set_speed_gauge.update()
 /** TODO: Ensure speed label matches up with needle values*/
  function updateSpeed(gauge, spd) {
     gauge.value = spd;
+    // gauge.update();
  }
 
 
@@ -176,12 +178,13 @@ function updateBattery(bat_pct) {
 function updateGraph(sec, curr) {
     // if (sec == 0)
     //     curr_graph.clear();
-    if(secs.length >= 15)
+    if (secs.length >= 15)
         secs.shift();
-    secs.push(sec);
-    if(currs.length >= 15)
+    if (currs.length >= 15)
         currs.shift();
-    currs.push(curr);
-    curr_graph.update();
-
+    if (Math.floor(sec) === parseInt(sec)) {
+        secs.push(sec);
+        currs.push(curr);
+        curr_graph.update();
+    }
 }
