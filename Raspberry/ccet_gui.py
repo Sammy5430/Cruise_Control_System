@@ -1,8 +1,8 @@
 import time
 import threading
 import socketio
-import keyboard
-from guizero import App, Text, Box, Picture
+# import keyboard
+from guizero import App, Text, Box, Picture, Window
 from gpiozero import MCP3008, Button, PWMOutputDevice, DigitalOutputDevice, DigitalInputDevice
 
 
@@ -62,7 +62,10 @@ class PiThread (threading.Thread):
         elif self.thread_name is "control":
             while True:
                 if not system_stop:
-                    pi_control_static()
+                    if controller is 'dynamic':
+                        pi_control()
+                    else:
+                        pi_control_static()
                     time.sleep(0.01)
 # ============================================= #
 
@@ -74,8 +77,13 @@ bat_lvl_3 = "/home/pi/Documents/CCET/Battery/battery3.png"
 bat_lvl_2 = "/home/pi/Documents/CCET/Battery/battery2.png"
 bat_lvl_1 = "/home/pi/Documents/CCET/Battery/battery1.png"
 bat_lvl_0 = "/home/pi/Documents/CCET/Battery/battery0.png"
+bat_low_img = "/home/pi/Documents/CCET/Battery/low_battery.png"
 cruise_on_img = '/home/pi/Documents/CCET/Cruise/CruiseON.png'
 cruise_off_img = '/home/pi/Documents/CCET/Cruise/CruiseOFF.png'
+logo_img = '/home/pi/Documents/CCET/Cruise/Favicon.png'
+control_static_img = '/home/pi/Documents/CCET/Controller/static_mode.png'
+control_dynamic_img = '/home/pi/Documents/CCET/Controller/dynamic_mode.png'
+warning_img = '/home/pi/Documents/CCET/Cruise/Warning.png'
 # ============================================= #
 
 # ================GPIO Pins================ #
@@ -88,7 +96,7 @@ pwm_out_pin = PWMOutputDevice(13)
 bts_enable_pin = DigitalOutputDevice(12)
 hall_pin = DigitalInputDevice(17)
 brake_sensor = DigitalInputDevice(18)
-is_throttle_active_pin = DigitalInputDevice(26)
+ctrl_toggle_pin = DigitalInputDevice(26)
 
 curr_sens_pin = MCP3008(channel=0, max_voltage=6)
 volt_sens_pin = MCP3008(channel=1, max_voltage=6)
@@ -101,20 +109,21 @@ is_cruise_on = False                        # flag for cruise on/off
 magnet_count = 0                            # times magnet has passed hall sensor
 deadband_throttle = (1/6)                   # sets the throttle to start reading after 1 Volts
 CURR_SENS_SENSITIVITY = 0.066               # Current sensor sensitivity
-rpm_val = 0                                 # latest RPM measurement
-prev_rpm_val = 0                            # previous RPM measurement(used for average measurements)
-mph_val = 0                                 # actual speed
+rpm_val = 0.0                                 # latest RPM measurement
+prev_rpm_val = 0.0                            # previous RPM measurement(used for average measurements)
+mph_val = 0.0                                 # actual speed
 v_sensor_val = 25                           # value from voltage sensor after conversion
 i_sensor_val = 0                            # value from the current sensor after conversion
 pwm_duty_cycle = 0                          # stores set value for PWM (ranges from 0 to 1)
 start_time = time.time()                    # start time for a fraction of a wheel spin. Used for RPM calculations
 end_time = 0                                # end time for a fraction of a wheel spin. Used for RPM calculations
 DIAMETER = 26                               # diameter of the system's wheel. Used for RPM-to-MPH conversion
-cruise_set_spd = 0                          # speed set by the user for cruising
-cruise_set_rpm = 0
+cruise_set_spd = 0.0                          # speed set by the user for cruising
+cruise_set_rpm = 0.0
 cruise_lvl_val = cruise_off_img             # used by the GUI to present whether cruise is on or off
 bat_pct = 100                               # battery percentage based on voltage readings. Used for battery indicator
 bat_lvl_val = bat_lvl_5                     # used by the GUI to present the battery charge level
+control_img = control_static_img
 bat_blink = False                           # flag for the GUI to blink the battery level indicator on low battery
 system_stop = False                         # flag for the kill switch to halt system execution
 prev_pwm = 0                                # used as a hold for control equation
@@ -132,7 +141,7 @@ THROTTLE_SENS_MIN = 0.9                    # minimum value for throttle sensor. 
 THROTTLE_SENS_MAX = 4                       # maximum value for throttle sensor
 REF_V_ADC = 6
 THROTTLE_CONVERSION = (1/((THROTTLE_SENS_MAX-THROTTLE_SENS_MIN)/REF_V_ADC))  # conversion factor from ADC to PWM
-# keyboard = kb.Controller()
+controller = 'static'
 # ========================================= #
 
 # ==============Enables==================== #
@@ -171,8 +180,9 @@ def adjust_throttle():
 # Serviced by "status" thread.
 # ============================================= #
 def bat_lvl_check():
-    global v_sensor_val, bat_lvl_val, bat_blink, bat_pct
+    global v_sensor_val, bat_lvl_val, bat_blink, bat_pct, system_stop, bts_enable_pin
     bat_pct = ((v_sensor_val - 23.16)/2.24) * 100   # (Vmeasured - Vmin) / (Vmax - Vmin)
+    # bat_pct = 0
     if bat_pct > 80:
         bat_lvl_val = bat_lvl_5
         bat_blink = False
@@ -192,24 +202,43 @@ def bat_lvl_check():
         bat_lvl_val = bat_lvl_1
         bat_blink = True
     else:
-        # TODO: Determine if charger is connected to automatically close popup
         bat_lvl_val = bat_lvl_0
         battery_info_img.value = bat_lvl_val
         bat_blink = False
-        bts_enable_pin.value = 0
-        app.warn(title="Warning", text="Low Battery. Please connect to charger.")
+        system_stop = True
+        warning_icon.value = bat_low_img
+        warning_icon.width = 120
+        warning_text.value = "Low Battery"
+        window.show()
+        window.focus()
+        stop_cruise()
     battery_info_img.value = bat_lvl_val
 # ============================================= #
 
 
+# TODO: Ensure brake_sensor.when_deactivated interrupt trigger
 # Deactivates cruise control when braking if cruise is engaged.
 # Serviced by main thread via interrupts
 # ============================================= #
 def brake_press():
-    global is_cruise_on
+    global is_cruise_on, bts_enable_pin
     if is_cruise_on:
         stop_cruise()
 # ============================================= #
+
+
+def check_controller():
+    global controller, control_info_img, control_img, control_dynamic_img, control_static_img
+    # if btn_kill_pin.value:
+    if ctrl_toggle_pin.value:
+        controller = 'dynamic'
+        print('dynamic controller selected')
+        control_img = control_dynamic_img
+    else:
+        controller = 'static'
+        print('static controller selected')
+        control_img = control_static_img
+    control_info_img.value = control_img
 
 
 # Proportional Integral Controller implementation.
@@ -359,35 +388,30 @@ def inc_speed_btn():
 # ============================================= #
 
 
-# TODO: Instead of popup, use a new app or window component
 # Kills the system in case of emergency. Shows popup warning until disengaged.
 # Serviced by main thread via interrupts.
 # ============================================= #
 def kill_btn():
-    global pwm_duty_cycle, cruise_set_spd, system_stop, app, mph_val, rpm_val
+    global pwm_duty_cycle, cruise_set_spd, system_stop, app, mph_val, rpm_val, window
     stop_cruise()
     system_stop = True
-    mph_val = 0
-    rpm_val = 0
+    mph_val = 0.0
+    rpm_val = 0.0
     mph_display()
-    print("murio")
     bts_enable_pin.value = 1
-    # app.warn(title="Warning", text="Emergency stop triggered. Release safety switch to continue.")
-    # system_stop = False
-    # keyboard.press(Key.enter)
-    # keyboard.release(Key.enter)
-    # print("revivio")
+    warning_img.value = warning_img
+    warning_img.width = 100
+    warning_text.value = "Emergency stop triggered.\nRelease safety switch to continue."
+    window.show()
+    window.focus()
 # ============================================= #
 
 
 def kill_btn_release():
-    global pwm_duty_cycle, cruise_set_spd, system_stop, app
+    global pwm_duty_cycle, cruise_set_spd, system_stop, app, window
     system_stop = False
-    keyboard.press_and_release('enter')
-    keyboard.send('space')
-    # keyboard.press(kb.Key.enter)
-    # keyboard.release(kb.Key.enter)
-    print("revivio")
+    window.hide()
+    bts_enable_pin.value = 0
 
 
 # Display MPH value on GUI.
@@ -430,7 +454,7 @@ def pwm_inc():
 # Serviced by "throttle" thread
 # ============================================= #
 def reduce_to_zero():
-    global is_throttle_active_pin, mph_val, start_time, cruise_set_spd
+    global mph_val, start_time, cruise_set_spd
     if time.time()-start_time > 1:
         while mph_val > 0:
             if throttle_sens_pin.value > deadband_throttle or mph_val < cruise_set_spd:
@@ -465,7 +489,6 @@ def stop_cruise():
     cruise_set_spd = 0
     cruise_set_rpm = 0
     set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
-    print('Cruise Stopped')
     pwm_duty_cycle = 0
     pwm_out_pin.value = pwm_duty_cycle
 # ============================================= #
@@ -477,7 +500,6 @@ def stop_cruise():
 def sys_current_check():
     global i_sensor_val
     i_sensor_val = (((curr_sens_pin.value + (curr_sens_pin.value*0.015)) * REF_V_ADC)-2.47) / CURR_SENS_SENSITIVITY
-    # print("System Current: {x:.4f}A".format(x=i_sensor_val))
 # ============================================= #
 
 
@@ -492,10 +514,6 @@ def sys_voltage_check():
         v_sensor_val = bat_measure_sum/bat_measure_cnt
         bat_measure_cnt = 0
         bat_measure_sum = 0
-        # print("Battery Voltage: {x:.1f}V".format(x=v_sensor_val))
-    # mv_sensor_val = motor_volt_sens_pin.value * 6 * 5
-    # print("Battery Voltage: {x:.1f}V".format(x=v_sensor_val))
-    # print("Motor Voltage: {y:.2f}V".format(y=mv_sensor_val))
 # ============================================= #
 
 
@@ -520,7 +538,15 @@ def update_rpm():
 app = App(title="Cruise Control Exhibition Tricycle", bg="#363636")
 
 header_box = Box(app, width="fill", align="top", border=False)
-header_text = Text(header_box, text="Cruise Control Exhibition Tricycle", color="white", height=2, size=24)
+ccet_logo_box = Box(header_box, height="fill", width="fill", align="left", border=False)
+ccet_logo_img_padding = Text(ccet_logo_box, text=" ", color="white", size=24, height=2, align='right')
+ccet_logo_img = Picture(ccet_logo_box, image=logo_img, width=60, height=60, align="right")
+header_text = Text(header_box, text="CCET       ", color="white", height=1, size=32, width="fill", align="left")
+
+control_info_box = Box(header_box, height="fill", width="fill", align="right", border=False)
+control_info_img_padding = Text(control_info_box, text="   ", color="white", size=24, height=2, align='right')
+control_info_img = Picture(control_info_box, image=control_img, width=120, height=60, align="right")
+control_info_text = Text(control_info_box, text="      Mode:", color="white", size=24, height=2)
 
 info_box = Box(app, width="fill", align="bottom", border=False)
 
@@ -531,7 +557,7 @@ cruise_info_text = Text(cruise_info_box, text="Cruise Control:", color="white", 
 
 # TODO: Add controller mode (static/dynamic)
 battery_info_box = Box(info_box, height="fill", width="fill", align="right", border=False)
-battery_info_img_padding = Text(battery_info_box, text=" ", color="white", size=24, height=2, align='right')
+battery_info_img_padding = Text(battery_info_box, text="   ", color="white", size=24, height=2, align='right')
 battery_info_img = Picture(battery_info_box, image=bat_lvl_val, width=120, height=60, align="right")
 battery_info_text = Text(battery_info_box, text="Battery:", color="white", size=24, height=2)
 
@@ -545,7 +571,15 @@ cur_spd_txt_padding = Text(cur_spd_box, text=" ", color="white", size=24, height
 cur_spd_text = Text(cur_spd_box, text="Current Speed", height=2, color="yellow", size=36)
 cur_spd = Text(cur_spd_box, text=str(mph_val)+" mph", color="yellow", size=60)
 
-app.set_full_screen('Esc')
+app.set_full_screen()
+
+window = Window(app, bg="red", height=200, visible=False)
+warning_icon_box = Box(window, height="fill", width="fill", align="top", border=False)
+warning_text_box = Box(window, height="fill", width="fill", align="bottom", border=False)
+warning_icon = Picture(warning_icon_box, image=warning_img, width=100, height=100, align="bottom")
+warning_text = Text(warning_text_box, text="Emergency stop triggered.\nRelease safety switch to continue.",
+                    color="white", size=30, height=2, align="top")
+window.set_full_screen()
 # =========================================== #
 
 # ================Manage Threads============= #
@@ -566,13 +600,20 @@ btn_inc_pin.when_pressed = inc_speed_btn
 btn_dec_pin.when_pressed = dec_speed_btn
 btn_set_pin.when_pressed = cruise_set_btn
 btn_kill_pin.when_activated = kill_btn
+btn_kill_pin.when_deactivated = kill_btn_release
+# btn_kill_pin.when_activated = check_controller
+# btn_kill_pin.when_deactivated = check_controller
 hall_pin.when_activated = rpm_count
 brake_sensor.when_deactivated = brake_press
-btn_kill_pin.when_deactivated = kill_btn_release
+ctrl_toggle_pin.when_activated = check_controller
+ctrl_toggle_pin.when_deactivated = check_controller
 # ========================================= #
 
+# ==============Initial Checks============= #
 if btn_kill_pin.value:
     kill_btn()
+check_controller()
+# ========================================= #
 
 app.display()
 

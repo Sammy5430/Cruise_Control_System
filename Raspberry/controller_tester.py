@@ -70,7 +70,7 @@ class PiThread (threading.Thread):
         elif self.thread_name is "test":
             while True:
                 if begin_test:
-                    f = open("/home/pi/Documents/CCET/dynamic_test_4_23_2021("+str(num_test)+").csv", 'a')
+                    f = open("/home/pi/Documents/CCET/dynamic_test_4_24_2021("+str(num_test)+").csv", 'a')
                     f.write("{x:.3f}, {y:.3f}, {z:.3f}, {w:.3f}, {v:.3f}\n".format(x=time.time()-test_start,
                                                                                    y=control_act, z=cruise_set_spd,
                                                                                    w=rpm_val, v=mph_val))
@@ -162,7 +162,7 @@ CONTROL_ZERO_STATIC = 0.902                 # static controller zero. Preliminar
 bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
 bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
 begin_test = False
-num_test = 1
+num_test = 20
 test_start = 0
 THROTTLE_SENS_MIN = 0.9                    # minimum value for throttle sensor. Interpreted as absolute zero throttle
 THROTTLE_SENS_MAX = 4                       # maximum value for throttle sensor
@@ -183,20 +183,14 @@ bts_enable_pin.value = 0
 def adjust_throttle():
     global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm
     if not is_cruise_on:
-        # if is_throttle_active_pin:
-        if throttle_sens_pin.value > (THROTTLE_SENS_MIN/REF_V_ADC) + ((mph_val / 10) / 1.974) + 0.01:
+        if throttle_sens_pin.value > 0.16:
             bts_enable_pin.value = 1
         else:
             bts_enable_pin.value = 0
         prev_pwm = pwm_duty_cycle
-        pwm_duty_cycle = (throttle_sens_pin.value + ((mph_val / 10) / 1.974) - (THROTTLE_SENS_MIN/REF_V_ADC)) * THROTTLE_CONVERSION
-        # if throttle_sens_pin.value > 0.16 and mph_val > 0.1:
-        #     if -0.1 < ((mph_val/10) - pwm_duty_cycle) < 0.1:
-        #         pwm_duty_cycle = pwm_duty_cycle + (((mph_val/10) + prev_pwm)/2)
-        #     elif ((mph_val / 10) - pwm_duty_cycle) < -0.1:
-        #         None
-        #     elif ((mph_val / 10) - pwm_duty_cycle) > 0.1:
-        #         pwm_duty_cycle = pwm_duty_cycle + (mph_val/10)
+        pwm_duty_cycle = (throttle_sens_pin.value - 0.16) * 1.974
+        if (mph_val/10) - pwm_duty_cycle > 0.05:
+            pwm_duty_cycle = pwm_duty_cycle + (mph_val/10)
         if pwm_duty_cycle <= 0:
             pwm_duty_cycle = 0
         elif pwm_duty_cycle > 1:
@@ -356,7 +350,7 @@ def cruise_set_btn():
             cruise_set_spd = mph_val
             cruise_set_rpm = rpm_val
             set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
-            f = open("/home/pi/Documents/CCET/dynamic_test_4_23_2021("+str(num_test)+").csv", 'w')
+            f = open("/home/pi/Documents/CCET/dynamic_test_4_24_2021("+str(num_test)+").csv", 'w')
             f.write("Time(s), Control Action, Set Speed(mph), RPM Out, MPH Out, Control Gain:{x:.5f}, "
                     "Control Zero:{y:.5f}\n".format(x=CONTROL_GAIN, y=CONTROL_ZERO))
             f.close()
