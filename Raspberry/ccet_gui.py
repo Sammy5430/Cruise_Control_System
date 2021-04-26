@@ -58,6 +58,7 @@ class PiThread (threading.Thread):
                 if not system_stop:
                     adjust_throttle()
                     time.sleep(0.1)
+
         elif self.thread_name is "control":
             while True:
                 if not system_stop:
@@ -554,6 +555,7 @@ cruise_info_img_padding = Text(cruise_info_box, text="    ", color="white", size
 cruise_info_img = Picture(cruise_info_box, image=cruise_lvl_val, width=70, height=70, align="right")
 cruise_info_text = Text(cruise_info_box, text="Cruise Control:", color="white", size=24, height=2)
 
+# TODO: Add controller mode (static/dynamic)
 battery_info_box = Box(info_box, height="fill", width="fill", align="right", border=False)
 battery_info_img_padding = Text(battery_info_box, text="   ", color="white", size=24, height=2, align='right')
 battery_info_img = Picture(battery_info_box, image=bat_lvl_val, width=120, height=60, align="right")
