@@ -10,7 +10,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 //Start server
 const server = app.listen(app.get('port'), () => {
-    console.log('Server listening at http://localhost:3000')
+    console.log('Server listening for connections');
     });
 
 

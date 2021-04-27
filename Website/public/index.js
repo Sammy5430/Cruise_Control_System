@@ -1,4 +1,4 @@
-const socket = io('http://localhost:3000');
+const socket = io('http://ccet.ece.uprm.edu');
 
 socket.connect();
 
@@ -134,12 +134,10 @@ set_speed_gauge.update()
 
  function updateCruiseStatus(state) {
     let c = document.getElementById("cruise_state");
-    if(state)
-    {
+    if(state){
         c.checked = true;
     }
-    else
-    {
+    else{
         c.checked = false;
     }
  }
