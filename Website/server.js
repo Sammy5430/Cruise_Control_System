@@ -3,14 +3,14 @@ const path = require('path');
 const app = express();
 
 //set port
-app.set('port', 3000);
+app.set('port', process.env.PORT || 3000);
 
 //static file
 app.use(express.static(path.join(__dirname, 'public')));
 
 //Start server
 const server = app.listen(app.get('port'), () => {
-    console.log('Server listening for connections');
+    console.log('Server started on port', app.get('port'));
     });
 
 
