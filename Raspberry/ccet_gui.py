@@ -39,7 +39,7 @@ class PiThread (threading.Thread):
 
         elif self.thread_name is "comms":
             sio = socketio.Client()
-            sio.connect('http://10.31.1.255:3000')
+            sio.connect('http://ccet.ece.uprm.edu')
             t = 0
             while True:
                 sio.emit('data_update', {
@@ -555,7 +555,6 @@ cruise_info_img_padding = Text(cruise_info_box, text="    ", color="white", size
 cruise_info_img = Picture(cruise_info_box, image=cruise_lvl_val, width=70, height=70, align="right")
 cruise_info_text = Text(cruise_info_box, text="Cruise Control:", color="white", size=24, height=2)
 
-# TODO: Add controller mode (static/dynamic)
 battery_info_box = Box(info_box, height="fill", width="fill", align="right", border=False)
 battery_info_img_padding = Text(battery_info_box, text="   ", color="white", size=24, height=2, align='right')
 battery_info_img = Picture(battery_info_box, image=bat_lvl_val, width=120, height=60, align="right")
