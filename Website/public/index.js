@@ -142,7 +142,6 @@ set_speed_gauge.update()
 
 function updateBattery(bat_pct) {
     let bat_img = document.getElementById("bat_lvl")
-    console.log(String(bat_pct))
     if (bat_pct > 80)
     {
         bat_img.src = "Images/Battery/battery5.png";
@@ -167,10 +166,13 @@ function updateBattery(bat_pct) {
     {
         bat_img.src = "Images/Battery/battery0.png";
     }
+    else
+    {
+        bat_img.src = "Images/Battery/low_battery.png";
+    }
  }
 
 
-/** TODO: Clear the graph on new pi connection*/
 function updateGraph(sec, curr) {
     if (sec === 0)
         while (secs.length > 0)
@@ -182,9 +184,17 @@ function updateGraph(sec, curr) {
         secs.shift();
     if (currs.length >= 15)
         currs.shift();
-    if ((sec-0.5) > secs[secs.length-1]) {
-        secs.push(sec);
+    if (secs.length > 1) {
+        if (Math.floor(sec) > secs[secs.length-1]) {
+            secs.push(Math.floor(sec));
+            currs.push(curr);
+            curr_graph.update();
+        }
+    }
+    else {
+        secs.push(Math.floor(sec));
         currs.push(curr);
         curr_graph.update();
     }
+
 }
