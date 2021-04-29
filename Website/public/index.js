@@ -13,9 +13,9 @@ socket.on('send_data', function (data) {
 
 let currs = [];
 let secs = [];
-
 let set_speed_gauge = newSpeedGauge('setspeed');
 let actual_speed_gauge = newSpeedGauge('actualspeed');
+
 
 function newSpeedGauge(renderLocation){
     return new RadialGauge({
@@ -62,7 +62,6 @@ function newSpeedGauge(renderLocation){
 }
 
 
-// TODO: need to make curr_graph size responsive
 let graph_ctx = document.getElementById('graph')
 let curr_graph = new Chart(graph_ctx,{
     type: 'line',
@@ -120,15 +119,13 @@ let curr_graph = new Chart(graph_ctx,{
     }
 })
 
-// if value >= 10, valueInt:2
+
 actual_speed_gauge.update()
 set_speed_gauge.update()
 
 
-/** TODO: Ensure speed label matches up with needle values*/
  function updateSpeed(gauge, spd) {
     gauge.value = spd;
-    // gauge.update();
  }
 
 
@@ -174,8 +171,12 @@ function updateBattery(bat_pct) {
 
 /** TODO: Clear the graph on new pi connection*/
 function updateGraph(sec, curr) {
-    // if (sec == 0)
-    //     curr_graph.clear();
+    if (sec === 0)
+        while (secs.length > 0)
+            secs.pop();
+        while (currs.length > 0)
+            currs.pop();
+        curr_graph.update();
     if (secs.length >= 15)
         secs.shift();
     if (currs.length >= 15)
