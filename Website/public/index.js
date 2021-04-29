@@ -170,7 +170,6 @@ function updateBattery(bat_pct) {
  }
 
 
-/** TODO: Clear the graph on new pi connection*/
 function updateGraph(sec, curr) {
     if (sec === 0)
         while (secs.length > 0)
@@ -182,9 +181,17 @@ function updateGraph(sec, curr) {
         secs.shift();
     if (currs.length >= 15)
         currs.shift();
-    if ((sec-0.5) > secs[secs.length-1]) {
-        secs.push(sec);
+    if (secs.length > 1) {
+        if (Math.floor(sec) > secs[secs.length-1]) {
+            secs.push(Math.floor(sec));
+            currs.push(curr);
+            curr_graph.update();
+        }
+    }
+    else {
+        secs.push(Math.floor(sec));
         currs.push(curr);
         curr_graph.update();
     }
+
 }
