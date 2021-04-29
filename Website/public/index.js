@@ -142,7 +142,6 @@ set_speed_gauge.update()
 
 function updateBattery(bat_pct) {
     let bat_img = document.getElementById("bat_lvl")
-    console.log(String(bat_pct))
     if (bat_pct > 80)
     {
         bat_img.src = "Images/Battery/battery5.png";
@@ -166,6 +165,10 @@ function updateBattery(bat_pct) {
     else if (bat_pct > 0)
     {
         bat_img.src = "Images/Battery/battery0.png";
+    }
+    else
+    {
+        bat_img.src = "Images/Battery/low_battery.png";
     }
  }
 
