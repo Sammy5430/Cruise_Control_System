@@ -38,8 +38,8 @@ class PiThread (threading.Thread):
                     mph_display()
 
         elif self.thread_name is "comms":
-            sio = socketio.Client()
-            sio.connect('http://ccet.ece.uprm.edu')
+            sio = socketio.Client(reconnection=True, reconnection_attempts=0)
+            sio.connect("http://ccet.ece.uprm.edu")
             t = 0
             while True:
                 sio.emit('data_update', {
