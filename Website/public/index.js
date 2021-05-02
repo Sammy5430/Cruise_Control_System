@@ -119,6 +119,68 @@ let curr_graph = new Chart(graph_ctx,{
     }
 })
 
+let spd_graph = new Chart(graph_ctx,{
+    type: 'line',
+    data: {
+        labels: secs,
+        datasets: [{
+            label: 'Current',
+            data: currs,
+            backgroundColor: 'rgba(255, 99, 132, 0.4)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            borderWidth: 1
+        },{
+            label: 'Current',
+            data: currs,
+            backgroundColor: 'rgba(255, 99, 132, 0.4)',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        legend:
+            {
+                display:false
+            },
+        scales: {
+            yAxes: [{
+                ticks: {
+                    beginAtZero: true,
+                    fontColor: 'rgba(255, 255, 255, 1)',
+                    fontSize: 14
+                },
+                gridLines: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                },
+                scaleLabel: {
+                    display: true,
+                    labelString: 'Current (A)',
+                    fontColor: 'rgba(255, 255, 255, 1)',
+                    fontSize: 20
+                }
+            }],
+            xAxes: [{
+                ticks: {
+                    beginAtZero: true,
+                    fontColor: 'rgba(255, 255, 255, 1)',
+                    fontSize: 14
+                },
+                gridLines: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                },
+                scaleLabel: {
+                    display: true,
+                    labelString: 'Time (s)',
+                    fontColor: 'rgba(255, 255, 255, 1)',
+                    fontSize: 20
+                }
+            }]
+
+        },
+
+    }
+})
+
 
 actual_speed_gauge.update()
 set_speed_gauge.update()
@@ -179,7 +241,6 @@ function updateGraph(sec, curr) {
             secs.pop();
         while (currs.length > 0)
             currs.pop();
-        curr_graph.update();
     if (secs.length >= 15)
         secs.shift();
     if (currs.length >= 15)
@@ -188,13 +249,11 @@ function updateGraph(sec, curr) {
         if (Math.floor(sec) > secs[secs.length-1]) {
             secs.push(Math.floor(sec));
             currs.push(curr);
-            curr_graph.update();
         }
     }
     else {
         secs.push(Math.floor(sec));
         currs.push(curr);
-        curr_graph.update();
     }
-
+    curr_graph.update();
 }
