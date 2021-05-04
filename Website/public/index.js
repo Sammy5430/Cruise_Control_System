@@ -240,11 +240,12 @@ function updateBattery(bat_pct) {
 
 
 function updateGraph(sec, curr) {
-    if (sec === 0)
+    if (sec === 0) {
         while (secs.length > 0)
             secs.pop();
         while (currs.length > 0)
             currs.pop();
+    }
     if (secs.length >= 15)
         secs.shift();
     if (currs.length >= 30)
