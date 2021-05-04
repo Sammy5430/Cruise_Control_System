@@ -6,7 +6,7 @@ socket.on('send_data', function (data) {
     updateCruiseStatus(data['Cruise State']);
     updateSpeed(set_speed_gauge, data['Set Speed']);
     updateSpeed(actual_speed_gauge, data['Actual Speed']);
-    updateGraph(data['Time'], data['Current']);
+    // updateGraph(data['Time'], data['Current']);
     updateSpdGraph(data['Time'], data['Set Speed'], data['Actual Speed']);
     updateBattery(data['Battery']);
 });
@@ -129,8 +129,8 @@ let spd_graph = new Chart(graph_ctx,{
         datasets: [{
             label: 'Actual Speed',
             data: act_spds,
-            backgroundColor: 'rgba(99, 132, 255, 0.4)',
-            // borderColor: 'rgba(99, 132, 255, 1)',
+            // backgroundColor: 'rgba(99, 132, 255, 0.4)',
+            borderColor: 'rgba(99, 132, 255, 1)',
             borderWidth: 1
         },{
             label: 'Set Speed',
@@ -191,6 +191,7 @@ set_speed_gauge.update()
 
  function updateSpeed(gauge, spd) {
     gauge.value = spd;
+    gauge.update()
  }
 
 
