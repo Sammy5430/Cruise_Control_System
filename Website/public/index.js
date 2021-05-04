@@ -119,67 +119,67 @@ let curr_graph = new Chart(graph_ctx,{
     }
 })
 
-let spd_graph = new Chart(graph_ctx,{
-    type: 'line',
-    data: {
-        labels: secs,
-        datasets: [{
-            label: 'Actual Speed',
-            data: currs,
-            backgroundColor: 'rgba(255, 99, 132, 0.4)',
-            borderColor: 'rgba(255, 99, 132, 1)',
-            borderWidth: 1
-        },{
-            label: 'Set Speed',
-            data: currs,
-            backgroundColor: 'rgba(255, 99, 132, 0.4)',
-            borderColor: 'rgba(255, 99, 132, 1)',
-            borderWidth: 1
-        }]
-    },
-    options: {
-        legend:
-            {
-                display:true
-            },
-        scales: {
-            yAxes: [{
-                ticks: {
-                    beginAtZero: true,
-                    fontColor: 'rgba(255, 255, 255, 1)',
-                    fontSize: 14
-                },
-                gridLines: {
-                    color: 'rgba(255, 255, 255, 0.1)'
-                },
-                scaleLabel: {
-                    display: true,
-                    labelString: 'Current (A)',
-                    fontColor: 'rgba(255, 255, 255, 1)',
-                    fontSize: 20
-                }
-            }],
-            xAxes: [{
-                ticks: {
-                    beginAtZero: true,
-                    fontColor: 'rgba(255, 255, 255, 1)',
-                    fontSize: 14
-                },
-                gridLines: {
-                    color: 'rgba(255, 255, 255, 0.1)'
-                },
-                scaleLabel: {
-                    display: true,
-                    labelString: 'Time (s)',
-                    fontColor: 'rgba(255, 255, 255, 1)',
-                    fontSize: 20
-                }
-            }]
-
-        },
-
-    }
-})
+// let spd_graph = new Chart(graph_ctx,{
+//     type: 'line',
+//     data: {
+//         labels: secs,
+//         datasets: [{
+//             label: 'Actual Speed',
+//             data: currs,
+//             backgroundColor: 'rgba(255, 99, 132, 0.4)',
+//             borderColor: 'rgba(255, 99, 132, 1)',
+//             borderWidth: 1
+//         },{
+//             label: 'Set Speed',
+//             data: currs,
+//             backgroundColor: 'rgba(255, 99, 132, 0.4)',
+//             borderColor: 'rgba(255, 99, 132, 1)',
+//             borderWidth: 1
+//         }]
+//     },
+//     options: {
+//         legend:
+//             {
+//                 display:true
+//             },
+//         scales: {
+//             yAxes: [{
+//                 ticks: {
+//                     beginAtZero: true,
+//                     fontColor: 'rgba(255, 255, 255, 1)',
+//                     fontSize: 14
+//                 },
+//                 gridLines: {
+//                     color: 'rgba(255, 255, 255, 0.1)'
+//                 },
+//                 scaleLabel: {
+//                     display: true,
+//                     labelString: 'Current (A)',
+//                     fontColor: 'rgba(255, 255, 255, 1)',
+//                     fontSize: 20
+//                 }
+//             }],
+//             xAxes: [{
+//                 ticks: {
+//                     beginAtZero: true,
+//                     fontColor: 'rgba(255, 255, 255, 1)',
+//                     fontSize: 14
+//                 },
+//                 gridLines: {
+//                     color: 'rgba(255, 255, 255, 0.1)'
+//                 },
+//                 scaleLabel: {
+//                     display: true,
+//                     labelString: 'Time (s)',
+//                     fontColor: 'rgba(255, 255, 255, 1)',
+//                     fontSize: 20
+//                 }
+//             }]
+//
+//         },
+//
+//     }
+// })
 
 
 actual_speed_gauge.update()
