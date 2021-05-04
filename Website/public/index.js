@@ -130,13 +130,13 @@ let spd_graph = new Chart(graph_ctx,{
             label: 'Actual Speed',
             data: act_spds,
             // backgroundColor: 'rgba(99, 132, 255, 0.4)',
-            borderColor: 'rgba(99, 132, 255, 1)',
+            borderColor: 'rgb(2,255,237)',
             borderWidth: 1
         },{
             label: 'Set Speed',
             data: set_spds,
-            backgroundColor: 'rgba(99, 255, 132, 0.4)',
-            borderColor: 'rgba(99, 255, 132, 1)',
+            // backgroundColor: 'rgba(99, 255, 132, 0.4)',
+            borderColor: 'rgb(34,255,80)',
             borderWidth: 1
         }]
     },
