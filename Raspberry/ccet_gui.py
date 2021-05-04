@@ -1,7 +1,6 @@
 import time
 import threading
 import socketio
-# import keyboard
 from guizero import App, Text, Box, Picture, Window
 from gpiozero import MCP3008, Button, PWMOutputDevice, DigitalOutputDevice, DigitalInputDevice
 
@@ -36,6 +35,7 @@ class PiThread (threading.Thread):
                     sys_current_check()
                     bat_lvl_check()
                     mph_display()
+                    check_controller()
 
         elif self.thread_name is "comms":
             sio = socketio.Client(reconnection=True, reconnection_attempts=0)
@@ -74,9 +74,11 @@ class PiThread (threading.Thread):
             while True:
                 if not system_stop:
                     if controller is 'dynamic':
-                        pi_control()
+                        pi_control_dynamic()
                     else:
                         pi_control_static()
+                    if is_cruise_on and ((time.time() - cruise_start_time) > MAX_CRUISE_TIME):
+                        stop_cruise()
                     time.sleep(0.01)
 # ============================================= #
 
@@ -157,6 +159,11 @@ NUM_MAGNETS = 10                            # Amount on magnets on the wheel. Us
 controller = 'static'                       # type of controller used. Should be either 'static' or 'dynamic'
 low_battery = False
 pwm_rev_out_pin.value = 0
+read_throttle = 0
+cruise_start_time = 0
+MAX_CRUISE_TIME = 90
+read_current = 0
+read_voltage = 0
 # ========================================= #
 
 # ==============Enables==================== #
@@ -170,24 +177,23 @@ bts_enable_pin.value = 0
 # PWM/ADC Ratio = (throttle_sens_pin.value - Throttle_min) * (1/((Throttle_max/Vref_ADC)-Throttle_min))
 # ============================================= #
 def adjust_throttle():
-    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm
-    if not is_cruise_on:
-        # if throttle_sens_pin.value > 0.13:
-        print(throttle_sens_pin.value)
-        if throttle_sens_pin.value > 0.16:
-            bts_enable_pin.value = 1
-        else:
-            bts_enable_pin.value = 0
-        prev_pwm = pwm_duty_cycle
-        pwm_duty_cycle = (throttle_sens_pin.value - 0.16) * 1.974
-        if (mph_val/10) - pwm_duty_cycle > 0.2:
-            pwm_duty_cycle = pwm_duty_cycle + (mph_val/10)
-        if pwm_duty_cycle <= 0:
-            pwm_duty_cycle = 0
-        elif pwm_duty_cycle > 1:
-            pwm_duty_cycle = 1
-        pwm_out_pin.value = pwm_duty_cycle
-        # print(pwm_duty_cycle)
+    global throttle_sens_pin, pwm_duty_cycle, is_cruise_on, prev_pwm, read_throttle
+    read_throttle = throttle_sens_pin.value
+    if read_throttle > 0.14:
+        if not is_cruise_on:
+            if read_throttle > 0.16:
+                bts_enable_pin.value = 1 
+            else:
+                bts_enable_pin.value = 0
+            prev_pwm = pwm_duty_cycle
+            pwm_duty_cycle = (read_throttle - 0.16) * 1.974
+            if (mph_val/10) - pwm_duty_cycle > 0.2:
+                pwm_duty_cycle = pwm_duty_cycle + (mph_val/10)
+            if pwm_duty_cycle <= 0:
+                pwm_duty_cycle = 0
+            elif pwm_duty_cycle > 1:
+                pwm_duty_cycle = 1
+            pwm_out_pin.value = pwm_duty_cycle
     reduce_to_zero()
 # ============================================= #
 
@@ -235,12 +241,11 @@ def bat_lvl_check():
 # ============================================= #
 
 
-# TODO: Ensure brake_sensor.when_deactivated interrupt trigger
 # Deactivates cruise control when braking if cruise is engaged.
 # Serviced by main thread via interrupts
 # ============================================= #
 def brake_press():
-    global is_cruise_on, bts_enable_pin
+    global is_cruise_on
     if is_cruise_on:
         stop_cruise()
 # ============================================= #
@@ -255,11 +260,9 @@ def check_controller():
     if mph_val < 0.1:
         if ctrl_toggle_pin.value:
             controller = 'dynamic'
-            print('dynamic controller selected')
             control_img = control_dynamic_img
         else:
             controller = 'static'
-            print('static controller selected')
             control_img = control_static_img
         control_info_img.value = control_img
 # ============================================= #
@@ -269,7 +272,7 @@ def check_controller():
 # Uses measured mph and set mph to automatically adjust driver output.
 # Serviced by "control" thread
 # ============================================= #
-def pi_control():
+def pi_control_dynamic():
     global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on, prev_pwm, control_err, control_act,\
         prev_control_act, prev_control_err, cruise_set_rpm, rpm_val
     if is_cruise_on:
@@ -355,11 +358,12 @@ def p_control():
 # Serviced by main thread via interrupts
 # ============================================= #
 def cruise_set_btn():
-    global cruise_set_spd, is_cruise_on, mph_val, cruise_set_rpm
+    global cruise_set_spd, is_cruise_on, mph_val, cruise_set_rpm, cruise_start_time
     if is_cruise_on:
         stop_cruise()
     else:
         if 3 <= mph_val <= 7:    # if less than 3mph, can't activate
+            cruise_start_time = time.time()
             is_cruise_on = True
             cruise_set_spd = mph_val
             cruise_set_rpm = rpm_val
@@ -416,15 +420,15 @@ def inc_speed_btn():
 # Serviced by main thread via interrupts.
 # ============================================= #
 def kill_btn():
-    global pwm_duty_cycle, cruise_set_spd, system_stop, app, mph_val, rpm_val, window
+    global system_stop, mph_val, rpm_val, window
     stop_cruise()
     system_stop = True
     mph_val = 0.0
     rpm_val = 0.0
     mph_display()
     bts_enable_pin.value = 1
-    warning_icon.value = warning_img
-    warning_icon.width = 100
+    # warning_icon.value = warning_img
+    # warning_icon.width = 100
     warning_text.value = "Emergency stop triggered.\nRelease safety switch to continue."
     window.show()
     window.focus()
@@ -435,7 +439,7 @@ def kill_btn():
 # Serviced by main thread via interrupts.
 # ============================================= #
 def kill_btn_release():
-    global pwm_duty_cycle, cruise_set_spd, system_stop, app, window
+    global system_stop, window
     system_stop = False
     window.hide()
     bts_enable_pin.value = 0
@@ -448,33 +452,6 @@ def kill_btn_release():
 def mph_display():
     global cur_spd, mph_val
     cur_spd.value = "{x:.1f} mph".format(x=mph_val)
-# ============================================= #
-
-
-# Decreases PWM in controlled steps. Used for testing purposes.
-# Serviced by main thread via interrupts.
-# ============================================= #
-def pwm_dec():
-    global pwm_duty_cycle
-    if pwm_duty_cycle > 0:
-        pwm_duty_cycle = pwm_duty_cycle - 0.05
-        if pwm_duty_cycle < 0:
-            pwm_duty_cycle = 0
-        pwm_out_pin.value = pwm_duty_cycle
-# ================================= ============ #
-
-
-# Increases PWM in controlled steps. Used for testing purposes.
-# Serviced by main thread via interrupts.
-# ============================================= #
-def pwm_inc():
-    global pwm_duty_cycle, bts_enable_pin
-    if pwm_duty_cycle < 1:
-        bts_enable_pin.value = 1
-        pwm_duty_cycle = pwm_duty_cycle + 0.05  # 0.05PWM = ~1.3V +- .1
-        if pwm_duty_cycle > 1:
-            pwm_duty_cycle = 1
-        pwm_out_pin.value = pwm_duty_cycle
 # ============================================= #
 
 
@@ -510,10 +487,11 @@ def rpm_count():
 # Auxiliary method to stop cruise functionality
 # ============================================= #
 def stop_cruise():
-    global is_cruise_on, cruise_set_spd, pwm_duty_cycle, pwm_out_pin, set_spd, cruise_set_rpm
+    global is_cruise_on, cruise_set_spd, pwm_duty_cycle, pwm_out_pin, set_spd, cruise_set_rpm, cruise_start_time
     is_cruise_on = False
     bts_enable_pin.value = 0
     time.sleep(0.5)
+    cruise_start_time = 0
     cruise_set_spd = 0
     cruise_set_rpm = 0
     set_spd.value = "{x:.1f} mph".format(x=cruise_set_spd)
@@ -526,8 +504,11 @@ def stop_cruise():
 # Serviced by "status" thread.
 # ============================================= #
 def sys_current_check():
-    global i_sensor_val
-    i_sensor_val = (((curr_sens_pin.value + (curr_sens_pin.value*0.015)) * REF_V_ADC)-2.47) / CURR_SENS_SENSITIVITY
+    global i_sensor_val, read_current
+    read_current = curr_sens_pin.value
+    if read_current > 0.1:
+        i_sensor_val = (((read_current + (read_current*0.015)) * REF_V_ADC)-2.46) / CURR_SENS_SENSITIVITY
+        print(i_sensor_val)
 # ============================================= #
 
 
@@ -535,9 +516,10 @@ def sys_current_check():
 # Serviced by "status" thread.
 # ============================================= #
 def sys_voltage_check():
-    global v_sensor_val, motor_volt_sens_pin, bat_measure_sum, bat_measure_cnt
+    global v_sensor_val, bat_measure_sum, bat_measure_cnt, read_voltage
+    read_voltage = volt_sens_pin.value
     bat_measure_cnt = bat_measure_cnt + 1
-    bat_measure_sum = bat_measure_sum + (volt_sens_pin.value * REF_V_ADC * 5)  # +-1%
+    bat_measure_sum = bat_measure_sum + (read_voltage * REF_V_ADC * 5)  # +-1%
     if bat_measure_cnt >= 60:
         v_sensor_val = bat_measure_sum/bat_measure_cnt
         bat_measure_cnt = 0
@@ -562,8 +544,9 @@ def update_rpm():
 
 
 # GUI Initialization and components instantiation
+# TODO: user manual: to add connection, press Esc, add wi-fi, reboot the system
 # ===================GUI===================== #
-app = App(title="Cruise Control Exhibition Tricycle", bg="#363636")
+app = App(title="Cruise Control Exhibition Tricycle", bg="#363636", visible=False)
 
 header_box = Box(app, width="fill", align="top", border=False)
 ccet_logo_box = Box(header_box, height="fill", width="fill", align="left", border=False)
@@ -630,15 +613,16 @@ btn_set_pin.when_pressed = cruise_set_btn
 btn_kill_pin.when_activated = kill_btn
 btn_kill_pin.when_deactivated = kill_btn_release
 hall_pin.when_activated = rpm_count
-brake_sensor.when_deactivated = brake_press
-ctrl_toggle_pin.when_activated = check_controller
-ctrl_toggle_pin.when_deactivated = check_controller
+brake_sensor.when_activated = brake_press
+# ctrl_toggle_pin.when_activated = check_controller
+# ctrl_toggle_pin.when_deactivated = check_controller
 # ========================================= #
 
 # ==============Initial Checks============= #
 if btn_kill_pin.value:
     kill_btn()
-check_controller()
+# check_controller()
 # ========================================= #
-
+time.sleep(0.3)
+app.show()
 app.display()

@@ -124,13 +124,13 @@ let spd_graph = new Chart(graph_ctx,{
     data: {
         labels: secs,
         datasets: [{
-            label: 'Current',
+            label: 'Actual Speed',
             data: currs,
             backgroundColor: 'rgba(255, 99, 132, 0.4)',
             borderColor: 'rgba(255, 99, 132, 1)',
             borderWidth: 1
         },{
-            label: 'Current',
+            label: 'Set Speed',
             data: currs,
             backgroundColor: 'rgba(255, 99, 132, 0.4)',
             borderColor: 'rgba(255, 99, 132, 1)',
@@ -140,7 +140,7 @@ let spd_graph = new Chart(graph_ctx,{
     options: {
         legend:
             {
-                display:false
+                display:true
             },
         scales: {
             yAxes: [{
@@ -189,6 +189,10 @@ set_speed_gauge.update()
  function updateSpeed(gauge, spd) {
     gauge.value = spd;
  }
+
+// function updateSpeed2(sec, spd) {
+//     gauge.value = spd;
+// }
 
 
  function updateCruiseStatus(state) {
@@ -243,17 +247,16 @@ function updateGraph(sec, curr) {
             currs.pop();
     if (secs.length >= 15)
         secs.shift();
-    if (currs.length >= 15)
+    if (currs.length >= 30)
         currs.shift();
     if (secs.length > 1) {
         if (Math.floor(sec) > secs[secs.length-1]) {
             secs.push(Math.floor(sec));
-            currs.push(curr);
         }
     }
     else {
         secs.push(Math.floor(sec));
-        currs.push(curr);
     }
+    currs.push(curr);
     curr_graph.update();
 }
