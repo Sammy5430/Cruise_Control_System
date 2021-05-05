@@ -180,7 +180,7 @@ MAX_CRUISE_TIME = 60                        # amount of time in seconds that cru
 read_current = 0                            # temporary container for current measurement
 read_voltage = 0                            # temporary container for voltage measurement
 connected = False                           # flag used to denote if the MCU is connected to the webpage
-DRIVER_SENSITIVITY = 24                     # used for conversion of voltage to pwm
+DRIVER_SENSITIVITY = 25.47                  # used for conversion of voltage to pwm
 # ========================================= #
 
 # ==============Enables==================== #
