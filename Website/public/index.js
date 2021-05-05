@@ -282,7 +282,7 @@ function updateSpdGraph(sec, set_spd, act_spd) {
             secs.push(Math.floor(sec));
         }
     }
-    else if (sec >= 1){
+    else{
         secs.push(Math.floor(sec));
     }
     set_spds.push(set_spd);

@@ -22,7 +22,7 @@ class PiThread (threading.Thread):
     def run(self):
         if self.thread_name is "status":
             while True:
-                if not system_stop:
+                if not system_stop and not low_battery:
                     if bat_blink:
                         battery_info_img.value = bat_lvl_1
                         time.sleep(0.25)
@@ -38,31 +38,46 @@ class PiThread (threading.Thread):
                     check_controller()
 
         elif self.thread_name is "comms":
-            sio = socketio.Client(reconnection=True, reconnection_attempts=0)
-            sio.connect("http://ccet.ece.uprm.edu")
-            t = 0
+            global connected
             while True:
-                if not low_battery:
-                    sio.emit('data_update', {
-                        'Battery': bat_pct,
-                        'Cruise State': is_cruise_on,
-                        'Set Speed': cruise_set_spd,
-                        'Actual Speed': mph_val,
-                        'Current': i_sensor_val,
-                        'Time': t
-                    })
-                    time.sleep(0.5)
-                    t = t+0.5
+                if not connected:
+                    try:
+                        sio = socketio.Client(reconnection=True, reconnection_attempts=0)
+                        sio.connect("http://ccet.ece.uprm.edu")
+                        connected = True
+                        t = 0
+                    except:
+                        time.sleep(5)
                 else:
-                    t = 0
-                    sio.emit('data_update', {
-                        'Battery': 0,
-                        'Cruise State': False,
-                        'Set Speed': 0.0,
-                        'Actual Speed': 0.0,
-                        'Current': 0,
-                        'Time': t
-                    })
+                    if not low_battery:
+                        try:
+                            sio.emit('data_update', {
+                                'Battery': bat_pct,
+                                'Cruise State': is_cruise_on,
+                                'Set Speed': cruise_set_spd,
+                                'Actual Speed': mph_val,
+                                'Current': i_sensor_val,
+                                'Time': t
+                            })
+                            time.sleep(0.5)
+                            t = t+0.5
+                        except:
+                            time.sleep(1)
+                            connected = False
+                    else:
+                        try:
+                            t = 0
+                            sio.emit('data_update', {
+                                'Battery': 0,
+                                'Cruise State': False,
+                                'Set Speed': 0.0,
+                                'Actual Speed': 0.0,
+                                'Current': 0,
+                                'Time': t
+                            })
+                        except:
+                            time.sleep(1)
+                            connected = False
 
         elif self.thread_name is "throttle":
             while True:
@@ -100,7 +115,6 @@ warning_img = '/home/pi/Documents/CCET/Cruise/Warning.png'
 # ============================================= #
 
 # ================GPIO Pins================ #
-btn_kill_pin = DigitalInputDevice(6)
 btn_inc_pin = Button(4)
 btn_dec_pin = Button(5)
 btn_set_pin = Button(25)
@@ -111,6 +125,7 @@ bts_enable_pin = DigitalOutputDevice(12)
 hall_pin = DigitalInputDevice(17)
 brake_sensor = DigitalInputDevice(18)
 ctrl_toggle_pin = DigitalInputDevice(26)
+btn_kill_pin = DigitalInputDevice(6)
 
 # ADC Pins
 curr_sens_pin = MCP3008(channel=0, max_voltage=6)
@@ -157,13 +172,15 @@ REF_V_ADC = 6                               # reference voltage used for the ana
 THROTTLE_CONVERSION = (1/((THROTTLE_SENS_MAX-THROTTLE_SENS_MIN)/REF_V_ADC))  # conversion factor from ADC to PWM
 NUM_MAGNETS = 10                            # Amount on magnets on the wheel. Used to calculate RPM
 controller = 'static'                       # type of controller used. Should be either 'static' or 'dynamic'
-low_battery = False
-pwm_rev_out_pin.value = 0
-read_throttle = 0
-cruise_start_time = 0
-MAX_CRUISE_TIME = 90
-read_current = 0
-read_voltage = 0
+low_battery = False                         # flag used to denote low voltage supply
+pwm_rev_out_pin.value = 0                   # reverse PWM pin value. Set to 0 since reverse is never used
+read_throttle = 0                           # temporary container for throttle measurement
+cruise_start_time = 0                       # used to determine how long cruise has been engaged.
+MAX_CRUISE_TIME = 60                        # amount of time in seconds that cruise is allowed to be on consecutively.
+read_current = 0                            # temporary container for current measurement
+read_voltage = 0                            # temporary container for voltage measurement
+connected = False                           # flag used to denote if the MCU is connected to the webpage
+DRIVER_SENSITIVITY = 24                     # used for conversion of voltage to pwm
 # ========================================= #
 
 # ==============Enables==================== #
@@ -205,8 +222,7 @@ def adjust_throttle():
 # ============================================= #
 def bat_lvl_check():
     global v_sensor_val, bat_lvl_val, bat_blink, bat_pct, system_stop, bts_enable_pin, low_battery
-    # bat_pct = ((v_sensor_val - 23.16)/2.24) * 100   # (Vmeasured - Vmin) / (Vmax - Vmin)
-    bat_pct = 100
+    bat_pct = ((v_sensor_val - 23.16)/2.24) * 100   # (Vmeasured - Vmin) / (Vmax - Vmin)
     if bat_pct > 80:
         bat_lvl_val = bat_lvl_5
         bat_blink = False
@@ -256,7 +272,6 @@ def brake_press():
 # ============================================= #
 def check_controller():
     global controller, control_info_img, control_img, control_dynamic_img, control_static_img
-    # if btn_kill_pin.value:
     if mph_val < 0.1:
         if ctrl_toggle_pin.value:
             controller = 'dynamic'
@@ -284,9 +299,9 @@ def pi_control_dynamic():
                                                       CONTROL_ZERO) + prev_control_act
         if control_act < 0:
             control_act = 0
-        elif control_act > 24:
-            control_act = 24
-        pwm_duty_cycle = (control_act/24)
+        elif control_act > DRIVER_SENSITIVITY:
+            control_act = DRIVER_SENSITIVITY
+        pwm_duty_cycle = (control_act/DRIVER_SENSITIVITY)
         if pwm_duty_cycle > 1:
             pwm_duty_cycle = 1
         prev_control_err = control_err
@@ -294,7 +309,7 @@ def pi_control_dynamic():
         pwm_out_pin.value = pwm_duty_cycle
     else:
         prev_control_err = rpm_val
-        prev_control_act = prev_pwm * 24
+        prev_control_act = prev_pwm * DRIVER_SENSITIVITY
 # ============================================= #
 
 
@@ -314,9 +329,9 @@ def pi_control_static():
                                                              CONTROL_ZERO_STATIC) + prev_control_act
         if control_act < 0:
             control_act = 0
-        elif control_act > 24:
-            control_act = 24
-        pwm_duty_cycle = (control_act/24)
+        elif control_act > DRIVER_SENSITIVITY:
+            control_act = DRIVER_SENSITIVITY
+        pwm_duty_cycle = (control_act/DRIVER_SENSITIVITY)
         if pwm_duty_cycle > 1:
             pwm_duty_cycle = 1
         prev_control_err = control_err
@@ -324,32 +339,7 @@ def pi_control_static():
         pwm_out_pin.value = pwm_duty_cycle
     else:
         prev_control_err = rpm_val
-        prev_control_act = prev_pwm * 24
-# ============================================= #
-
-
-# Proportional Controller implementation.
-# Uses measured mph and set mph to automatically adjust driver output.
-# Serviced by "control" thread
-# ============================================= #
-def p_control():
-    global cruise_set_spd, mph_val, pwm_duty_cycle, is_cruise_on, prev_pwm
-    if is_cruise_on:
-        prev_pwm = pwm_duty_cycle
-        if not bts_enable_pin.value:
-            bts_enable_pin.value = 1
-        # x = ((cruise_set_spd - mph_val) * 2)   # gain = 2(arbitrary), set val in RPM
-        x = ((cruise_set_spd-mph_val)/9.54929) * 2.5
-        x = x * 5280 * (12/DIAMETER) * (1/3.14) * (1/60)
-        if x < 0:
-            x = 0
-            # bts_enable_pin.value = 0
-        elif x > 24:
-            x = 24
-        pwm_duty_cycle = (x / 24)  # + (cruise_set_spd/10)
-        if pwm_duty_cycle > 1:
-            pwm_duty_cycle = 1
-        pwm_out_pin.value = pwm_duty_cycle
+        prev_control_act = prev_pwm * DRIVER_SENSITIVITY
 # ============================================= #
 
 
@@ -362,7 +352,7 @@ def cruise_set_btn():
     if is_cruise_on:
         stop_cruise()
     else:
-        if 3 <= mph_val <= 7:    # if less than 3mph, can't activate
+        if 3 <= mph_val <= 7:
             cruise_start_time = time.time()
             is_cruise_on = True
             cruise_set_spd = mph_val
@@ -427,8 +417,6 @@ def kill_btn():
     rpm_val = 0.0
     mph_display()
     bts_enable_pin.value = 1
-    # warning_icon.value = warning_img
-    # warning_icon.width = 100
     warning_text.value = "Emergency stop triggered.\nRelease safety switch to continue."
     window.show()
     window.focus()
@@ -478,7 +466,6 @@ def reduce_to_zero():
 def rpm_count():
     global magnet_count
     magnet_count = magnet_count + 1
-    # if magnet_count >= 2:
     if magnet_count >= 1:
         update_rpm()
 # ============================================= #
@@ -506,9 +493,8 @@ def stop_cruise():
 def sys_current_check():
     global i_sensor_val, read_current
     read_current = curr_sens_pin.value
-    if read_current > 0.1:
-        i_sensor_val = (((read_current + (read_current*0.015)) * REF_V_ADC)-2.46) / CURR_SENS_SENSITIVITY
-        print(i_sensor_val)
+    if read_current > 0.01:
+        i_sensor_val = (((read_current + (read_current * 0.015)) * REF_V_ADC) - 2.53) / CURR_SENS_SENSITIVITY
 # ============================================= #
 
 
@@ -518,12 +504,13 @@ def sys_current_check():
 def sys_voltage_check():
     global v_sensor_val, bat_measure_sum, bat_measure_cnt, read_voltage
     read_voltage = volt_sens_pin.value
-    bat_measure_cnt = bat_measure_cnt + 1
-    bat_measure_sum = bat_measure_sum + (read_voltage * REF_V_ADC * 5)  # +-1%
-    if bat_measure_cnt >= 60:
-        v_sensor_val = bat_measure_sum/bat_measure_cnt
-        bat_measure_cnt = 0
-        bat_measure_sum = 0
+    if read_voltage > 0.01:
+        bat_measure_cnt = bat_measure_cnt + 1
+        bat_measure_sum = bat_measure_sum + (read_voltage * REF_V_ADC * 5)  # +-1%
+        if bat_measure_cnt >= 20:
+            v_sensor_val = bat_measure_sum/bat_measure_cnt
+            bat_measure_cnt = 0
+            bat_measure_sum = 0
 # ============================================= #
 
 
@@ -583,7 +570,7 @@ cur_spd = Text(cur_spd_box, text=str(mph_val)+" mph", color="yellow", size=60)
 
 app.set_full_screen()
 
-# Window use for system warnings
+# Window used for system warnings
 window = Window(app, bg="red", height=200, visible=False)
 warning_icon_box = Box(window, height="fill", width="fill", align="top", border=False)
 warning_text_box = Box(window, height="fill", width="fill", align="bottom", border=False)
@@ -614,15 +601,13 @@ btn_kill_pin.when_activated = kill_btn
 btn_kill_pin.when_deactivated = kill_btn_release
 hall_pin.when_activated = rpm_count
 brake_sensor.when_activated = brake_press
-# ctrl_toggle_pin.when_activated = check_controller
-# ctrl_toggle_pin.when_deactivated = check_controller
 # ========================================= #
 
 # ==============Initial Checks============= #
 if btn_kill_pin.value:
     kill_btn()
-# check_controller()
 # ========================================= #
+
 time.sleep(0.3)
 app.show()
 app.display()
