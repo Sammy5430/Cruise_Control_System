@@ -99,33 +99,33 @@ class PiThread (threading.Thread):
 
 
 # ==================Files====================== #
-bat_lvl_5 = "/home/pi/Documents/CCET/Battery/battery5.png"
-bat_lvl_4 = "/home/pi/Documents/CCET/Battery/battery4.png"
-bat_lvl_3 = "/home/pi/Documents/CCET/Battery/battery3.png"
-bat_lvl_2 = "/home/pi/Documents/CCET/Battery/battery2.png"
-bat_lvl_1 = "/home/pi/Documents/CCET/Battery/battery1.png"
-bat_lvl_0 = "/home/pi/Documents/CCET/Battery/battery0.png"
 bat_low_img = "/home/pi/Documents/CCET/Battery/low_battery.png"
-cruise_on_img = '/home/pi/Documents/CCET/Cruise/CruiseON.png'
-cruise_off_img = '/home/pi/Documents/CCET/Cruise/CruiseOFF.png'
-logo_img = '/home/pi/Documents/CCET/Cruise/Favicon.png'
-control_static_img = '/home/pi/Documents/CCET/Controller/static_mode.png'
+bat_lvl_0 = "/home/pi/Documents/CCET/Battery/battery0.png"
+bat_lvl_1 = "/home/pi/Documents/CCET/Battery/battery1.png"
+bat_lvl_2 = "/home/pi/Documents/CCET/Battery/battery2.png"
+bat_lvl_3 = "/home/pi/Documents/CCET/Battery/battery3.png"
+bat_lvl_4 = "/home/pi/Documents/CCET/Battery/battery4.png"
+bat_lvl_5 = "/home/pi/Documents/CCET/Battery/battery5.png"
 control_dynamic_img = '/home/pi/Documents/CCET/Controller/dynamic_mode.png'
+control_static_img = '/home/pi/Documents/CCET/Controller/static_mode.png'
+cruise_off_img = '/home/pi/Documents/CCET/Cruise/CruiseOFF.png'
+cruise_on_img = '/home/pi/Documents/CCET/Cruise/CruiseON.png'
+logo_img = '/home/pi/Documents/CCET/Cruise/Favicon.png'
 warning_img = '/home/pi/Documents/CCET/Cruise/Warning.png'
 # ============================================= #
 
 # ================GPIO Pins================ #
-btn_inc_pin = Button(4)
 btn_dec_pin = Button(5)
+btn_inc_pin = Button(4)
 btn_set_pin = Button(25)
 
+brake_sensor = DigitalInputDevice(18)
+btn_kill_pin = DigitalInputDevice(6)
+bts_enable_pin = DigitalOutputDevice(12)
+ctrl_toggle_pin = DigitalInputDevice(26)
+hall_pin = DigitalInputDevice(17)
 pwm_out_pin = PWMOutputDevice(13)
 pwm_rev_out_pin = PWMOutputDevice(19)
-bts_enable_pin = DigitalOutputDevice(12)
-hall_pin = DigitalInputDevice(17)
-brake_sensor = DigitalInputDevice(18)
-ctrl_toggle_pin = DigitalInputDevice(26)
-btn_kill_pin = DigitalInputDevice(6)
 
 # ADC Pins
 curr_sens_pin = MCP3008(channel=0, max_voltage=6)
@@ -134,57 +134,65 @@ throttle_sens_pin = MCP3008(channel=2, max_voltage=6)
 # ========================================= #
 
 # ===============Variables================= #
-is_cruise_on = False                        # flag for cruise on/off
-magnet_count = 0                            # times magnet has passed hall sensor
-THROTTLE_DEADBAND = (1/6)                   # sets the throttle to start reading after 1 Volts
-CURR_SENS_SENSITIVITY = 0.066               # Current sensor sensitivity
-rpm_val = 0.0                               # latest RPM measurement
-prev_rpm_val = 0.0                          # previous RPM measurement(used for average measurements)
-mph_val = 0.0                               # actual speed
-v_sensor_val = 25                           # value from voltage sensor after conversion
-i_sensor_val = 0                            # value from the current sensor after conversion
-pwm_duty_cycle = 0                          # stores set value for PWM (ranges from 0 to 1)
-start_time = time.time()                    # start time for a fraction of a wheel spin. Used for RPM calculations
-end_time = 0                                # end time for a fraction of a wheel spin. Used for RPM calculations
-DIAMETER = 26                               # diameter of the system's wheel. Used for RPM-to-MPH conversion
+bat_lvl_val = bat_lvl_5                     # used by the GUI to present the battery charge level
+bat_pct = 100                               # battery percentage based on voltage readings. Used for battery indicator
+bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
+bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
+controller = 'static'                       # type of controller used. Should be either 'static' or 'dynamic'
+control_act = 0                             # determined output for the controller. Measured currently
+control_err = 0                             # difference between set speed and actual speed. Measured currently
+control_img = control_static_img            # used by the GUI to present the type of controller being
+cruise_lvl_val = cruise_off_img             # used by the GUI to present whether cruise is on or off
 cruise_set_spd = 0.0                        # speed set by the user for cruising. Expressed in mph
 cruise_set_rpm = 0.0                        # speed set by the user for cruising. Expressed in rpm
-cruise_lvl_val = cruise_off_img             # used by the GUI to present whether cruise is on or off
-bat_pct = 100                               # battery percentage based on voltage readings. Used for battery indicator
-bat_lvl_val = bat_lvl_5                     # used by the GUI to present the battery charge level
-control_img = control_static_img            # used by the GUI to present the type of controller being
-bat_blink = False                           # flag for the GUI to blink the battery level indicator on low battery
-system_stop = False                         # flag for the kill switch to halt system execution
-prev_pwm = 0                                # used as a hold for control equation
-control_err = 0                             # difference between set speed and actual speed. Measured currently
-prev_control_err = 0                        # difference between set speed and actual speed. Previous measurement
-control_act = 0                             # determined output for the controller. Measured currently
+cruise_start_time = 0                       # used to determine how long cruise has been engaged.
+end_time = 0                                # end time for a fraction of a wheel spin. Used for RPM calculations
+i_sensor_val = 0                            # value from the current sensor after conversion
+magnet_count = 0                            # times magnet has passed hall sensor
+mph_val = 0.0                               # actual speed
 prev_control_act = 0                        # determined output for the controller. Previous measurement
+prev_control_err = 0                        # difference between set speed and actual speed. Previous measurement
+prev_pwm = 0                                # used as a hold for control equation
+prev_rpm_val = 0.0                          # previous RPM measurement(used for average measurements)
+pwm_duty_cycle = 0                          # stores set value for PWM (ranges from 0 to 1)
+pwm_rev_out_pin.value = 0                   # reverse PWM pin value. Set to 0 since reverse is never used
+read_current = 0                            # temporary container for current measurement
+read_throttle = 0                           # temporary container for throttle measurement
+read_voltage = 0                            # temporary container for voltage measurement
+rpm_val = 0.0                               # latest RPM measurement
+start_time = time.time()                    # start time for a fraction of a wheel spin. Used for RPM calculations
+v_sensor_val = 25                           # value from voltage sensor after conversion
+# ========================================= #
+
+# ==================Flags================== #
+bat_blink = False                           # flag for the GUI to blink the battery level indicator on low battery
+connected = False                           # flag used to denote if the MCU is connected to the webpage
+is_cruise_on = False                        # flag for cruise on/off
+low_battery = False                         # flag used to denote low voltage supply
+system_stop = False                         # flag for the kill switch to halt system execution
+# ========================================= #
+
+# ===============Constants================= #
+THROTTLE_DEADBAND = (1/6)                   # sets the throttle to start reading after 1 Volts
+CURR_SENS_SENSITIVITY = 0.066               # Current sensor sensitivity
+DIAMETER = 26                               # diameter of the system's wheel. Used for RPM-to-MPH conversion
 CONTROL_GAIN = 0.15078                      # dynamic controller gain.
 CONTROL_ZERO = 0.991                        # dynamic controller zero.
 CONTROL_GAIN_STATIC = 0.04027               # static controller gain.
 CONTROL_ZERO_STATIC = 0.902                 # static controller zero.
-bat_measure_sum = 0                         # sum of battery measurements. Used to average battery measurements
-bat_measure_cnt = 0                         # count of battery measurements. Used to average battery measurements
 THROTTLE_SENS_MIN = 0.9                     # minimum value for throttle sensor. Interpreted as absolute zero throttle
 THROTTLE_SENS_MAX = 4                       # maximum value for throttle sensor
 REF_V_ADC = 6                               # reference voltage used for the analog-to-digital converter
 THROTTLE_CONVERSION = (1/((THROTTLE_SENS_MAX-THROTTLE_SENS_MIN)/REF_V_ADC))  # conversion factor from ADC to PWM
 NUM_MAGNETS = 10                            # Amount on magnets on the wheel. Used to calculate RPM
-controller = 'static'                       # type of controller used. Should be either 'static' or 'dynamic'
-low_battery = False                         # flag used to denote low voltage supply
-pwm_rev_out_pin.value = 0                   # reverse PWM pin value. Set to 0 since reverse is never used
-read_throttle = 0                           # temporary container for throttle measurement
-cruise_start_time = 0                       # used to determine how long cruise has been engaged.
 MAX_CRUISE_TIME = 60                        # amount of time in seconds that cruise is allowed to be on consecutively.
-read_current = 0                            # temporary container for current measurement
-read_voltage = 0                            # temporary container for voltage measurement
-connected = False                           # flag used to denote if the MCU is connected to the webpage
 DRIVER_SENSITIVITY = 25.47                  # used for conversion of voltage to pwm
+MAX_V = 25.4                                # maximum voltage for the system's batteries. Considered as 100% charge
+MIN_V = 23.16                               # minimum voltage for the system's batteries. Considered as 0% charge
 # ========================================= #
 
 # ==============Enables==================== #
-bts_enable_pin.value = 0
+bts_enable_pin.value = 0                    # used to activate or deactivate motor driver
 # ========================================= #
 
 
@@ -216,13 +224,11 @@ def adjust_throttle():
 
 
 # Uses measured system voltage to adjust battery charge icon in GUI.
-# 25.4V will be considered a system battery of 100%
-# 23.16V will be considered a system battery of 0%
 # Serviced by "status" thread.
 # ============================================= #
 def bat_lvl_check():
     global v_sensor_val, bat_lvl_val, bat_blink, bat_pct, system_stop, bts_enable_pin, low_battery
-    bat_pct = ((v_sensor_val - 23.16)/2.24) * 100   # (Vmeasured - Vmin) / (Vmax - Vmin)
+    bat_pct = ((v_sensor_val - MIN_V)/(MAX_V-MIN_V)) * 100
     if bat_pct > 80:
         bat_lvl_val = bat_lvl_5
         bat_blink = False
@@ -494,7 +500,7 @@ def sys_current_check():
     global i_sensor_val, read_current
     read_current = curr_sens_pin.value
     if read_current > 0.01:
-        i_sensor_val = (((read_current + (read_current * 0.015)) * REF_V_ADC) - 2.53) / CURR_SENS_SENSITIVITY
+        i_sensor_val = (((read_current + (read_current * 0.015)) * REF_V_ADC) - 2.47) / CURR_SENS_SENSITIVITY
 # ============================================= #
 
 
@@ -506,7 +512,7 @@ def sys_voltage_check():
     read_voltage = volt_sens_pin.value
     if read_voltage > 0.01:
         bat_measure_cnt = bat_measure_cnt + 1
-        bat_measure_sum = bat_measure_sum + (read_voltage * REF_V_ADC * 5)  # +-1%
+        bat_measure_sum = bat_measure_sum + ((read_voltage * REF_V_ADC * 5) - 0.45)
         if bat_measure_cnt >= 20:
             v_sensor_val = bat_measure_sum/bat_measure_cnt
             bat_measure_cnt = 0
@@ -531,7 +537,6 @@ def update_rpm():
 
 
 # GUI Initialization and components instantiation
-# TODO: user manual: to add connection, press Esc, add wi-fi, reboot the system
 # ===================GUI===================== #
 app = App(title="Cruise Control Exhibition Tricycle", bg="#363636", visible=False)
 
