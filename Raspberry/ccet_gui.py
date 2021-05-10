@@ -586,7 +586,6 @@ window.set_full_screen()
 # =========================================== #
 
 # ================Manage Threads============= #
-# threadLock = threading.Lock()
 status_thread = PiThread(1, "status")
 control_thread = PiThread(2, "control")
 comms_thread = PiThread(3, "comms")

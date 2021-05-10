@@ -6,13 +6,11 @@ socket.on('send_data', function (data) {
     updateCruiseStatus(data['Cruise State']);
     updateSpeed(set_speed_gauge, data['Set Speed']);
     updateSpeed(actual_speed_gauge, data['Actual Speed']);
-    // updateGraph(data['Time'], data['Current']);
     updateSpdGraph(data['Time'], data['Set Speed'], data['Actual Speed']);
     updateBattery(data['Battery']);
 });
 
 
-let currs = [];
 let secs = [];
 let act_spds = [];
 let set_spds = [];
@@ -66,62 +64,6 @@ function newSpeedGauge(renderLocation){
 
 
 let graph_ctx = document.getElementById('graph')
-// let curr_graph = new Chart(graph_ctx,{
-//     type: 'line',
-//     data: {
-//         labels: secs,
-//         datasets: [{
-//             label: 'Current',
-//             data: currs,
-//             backgroundColor: 'rgba(255, 99, 132, 0.4)',
-//             borderColor: 'rgba(255, 99, 132, 1)',
-//             borderWidth: 1
-//         }]
-//     },
-//     options: {
-//         legend:
-//             {
-//                 display:false
-//             },
-//         scales: {
-//             yAxes: [{
-//                 ticks: {
-//                     beginAtZero: true,
-//                     fontColor: 'rgba(255, 255, 255, 1)',
-//                     fontSize: 14
-//                 },
-//                 gridLines: {
-//                     color: 'rgba(255, 255, 255, 0.1)'
-//                 },
-//                 scaleLabel: {
-//                     display: true,
-//                     labelString: 'Current (A)',
-//                     fontColor: 'rgba(255, 255, 255, 1)',
-//                     fontSize: 20
-//                 }
-//             }],
-//             xAxes: [{
-//                 ticks: {
-//                     beginAtZero: true,
-//                     fontColor: 'rgba(255, 255, 255, 1)',
-//                     fontSize: 14
-//                 },
-//                 gridLines: {
-//                     color: 'rgba(255, 255, 255, 0.1)'
-//                 },
-//                 scaleLabel: {
-//                     display: true,
-//                     labelString: 'Time (s)',
-//                     fontColor: 'rgba(255, 255, 255, 1)',
-//                     fontSize: 20
-//                 }
-//             }]
-//
-//         },
-//
-//     }
-// })
-
 let spd_graph = new Chart(graph_ctx,{
     type: 'line',
     data: {
@@ -129,13 +71,11 @@ let spd_graph = new Chart(graph_ctx,{
         datasets: [{
             label: 'Actual Speed',
             data: act_spds,
-            // backgroundColor: 'rgba(99, 132, 255, 0.4)',
             borderColor: 'rgb(2,255,237)',
             borderWidth: 1
         },{
             label: 'Set Speed',
             data: set_spds,
-            // backgroundColor: 'rgba(99, 255, 132, 0.4)',
             borderColor: 'rgb(34,255,80)',
             borderWidth: 1
         }]
@@ -237,30 +177,6 @@ function updateBattery(bat_pct) {
         bat_img.src = "Images/Battery/low_battery.png";
     }
  }
-
-
-function updateGraph(sec, curr) {
-    if (sec === 0) {
-        while (secs.length > 0)
-            secs.pop();
-        while (currs.length > 0)
-            currs.pop();
-    }
-    if (secs.length >= 15)
-        secs.shift();
-    if (currs.length >= 30)
-        currs.shift();
-    if (secs.length > 1) {
-        if (Math.floor(sec) > secs[secs.length-1]) {
-            secs.push(Math.floor(sec));
-        }
-    }
-    else if (sec >= 1){
-        secs.push(Math.floor(sec));
-    }
-    currs.push(curr);
-    curr_graph.update();
-}
 
 function updateSpdGraph(sec, set_spd, act_spd) {
     if (sec === 0) {
